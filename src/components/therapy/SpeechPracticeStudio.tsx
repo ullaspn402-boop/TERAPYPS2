@@ -142,8 +142,7 @@ export const SpeechPracticeStudio: React.FC = () => {
   // ── Filtered stimuli by patient targetSound + activeLanguage ─────────
   const patientTarget = selectedPatient?.targetSound || '';
   const soundStimuli = SPEECH_STIMULI_BANK.filter(s => s.targetSound === patientTarget);
-  const langMatch = soundStimuli.filter(s => s.language?.toLowerCase() === activeLanguage.toLowerCase());
-  const availableStimuli = langMatch.length > 0 ? langMatch : soundStimuli.length > 0 ? soundStimuli : [];
+  const availableStimuli = soundStimuli.filter(s => s.language?.toLowerCase() === activeLanguage.toLowerCase());
   const currentStimulus: SpeechStimulus =
     availableStimuli.length > 0
       ? availableStimuli[selectedStimulusIndex % availableStimuli.length]
@@ -586,9 +585,12 @@ export const SpeechPracticeStudio: React.FC = () => {
               <span className="text-xs bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded">
                 Level: {selectedPatient.currentLevel}
               </span>
+              <span className="text-xs bg-purple-50 text-purple-700 font-semibold px-2 py-0.5 rounded">
+                Therapy Lang: {selectedPatient.therapyLanguage || 'Telugu'}
+              </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              {selectedPatient.diagnosis} • Clinical Practicum under Dr. Sarah Mehta
+              {selectedPatient.diagnosis} • Native: {selectedPatient.primaryLanguage || selectedPatient.therapyLanguage} • Practicum under Dr. Sarah Mehta
             </p>
           </div>
         </div>
