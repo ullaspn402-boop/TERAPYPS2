@@ -1,7 +1,21 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Patient from '../models/Patient';
 import Case from '../models/Case';
 import { AuthRequest } from '../middleware/auth';
+
+const findPatientSafely = async (paramId: string) => {
+  if (!paramId) return null;
+  if (mongoose.Types.ObjectId.isValid(paramId)) {
+    const p = await Patient.findById(paramId);
+    if (p) return p;
+  }
+  let p = await Patient.findOne({ patientId: paramId });
+  if (p) return p;
+  p = await Patient.findOne({ caseId: paramId });
+  if (p) return p;
+  return null;
+};
 
 export const getPatients = async (req: AuthRequest, res: Response) => {
   try {
@@ -11,8 +25,6 @@ export const getPatients = async (req: AuthRequest, res: Response) => {
     let patientQuery: any = {};
 
     if (role === 'student_therapist') {
-      // FIX: Strictly filter to only THIS therapist's own patients.
-      // Do NOT include a $nin fallback — that was leaking other users' patients.
       const myCases = await Case.find({ therapistId: userId }).select('patientId');
       const myPatientIds = myCases.map(c => c.patientId);
 
@@ -23,13 +35,10 @@ export const getPatients = async (req: AuthRequest, res: Response) => {
         ],
       };
     } else if (role === 'supervisor') {
-      // FIX: Supervisor sees ONLY patients whose cases are submitted to them.
-      // No empty fallback to all patients — a new supervisor starts with 0.
       const supervisorCases = await Case.find({ supervisorId: userId }).select('patientId');
       const supervisorPatientIds = supervisorCases.map(c => c.patientId);
       patientQuery = { _id: { $in: supervisorPatientIds } };
     } else if (role === 'admin') {
-      // Admin sees all
       patientQuery = {};
     } else {
       patientQuery = {};
@@ -47,16 +56,14 @@ export const getPatients = async (req: AuthRequest, res: Response) => {
 
 export const getPatientById = async (req: Request, res: Response) => {
   try {
-    let patient = await Patient.findById(req.params.id)
+    const patient = await findPatientSafely(req.params.id);
+    if (!patient) return res.status(404).json({ success: false, error: 'Patient not found' });
+
+    const populated = await Patient.findById(patient._id)
       .populate('assignedTherapistId', 'name role avatarType')
       .populate('supervisorId', 'name title avatarType');
-    if (!patient) {
-      patient = await Patient.findOne({ patientId: req.params.id })
-        .populate('assignedTherapistId', 'name role avatarType')
-        .populate('supervisorId', 'name title avatarType');
-    }
-    if (!patient) return res.status(404).json({ success: false, error: 'Patient not found' });
-    res.json({ success: true, data: patient });
+
+    res.json({ success: true, data: populated });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -102,7 +109,7 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
       priority: 'Normal',
       primaryLanguage: primaryLanguage || 'English',
       therapyLanguage: therapyLanguage || 'English',
-      assignedTherapistId: creatorId,  // therapist who registered the patient owns them
+      assignedTherapistId: creatorId,
       sessionCount: 0,
       totalTargetSessions: 16,
       attendancePct: 100,
@@ -120,7 +127,7 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
     await Case.create({
       caseId,
       patientId: patient._id,
-      therapistId: creatorId,   // case owner = the therapist who created it
+      therapistId: creatorId,
       status: 'NEW',
       complexity: 'Medium',
       priority: 'Normal',
@@ -140,10 +147,7 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
 
 export const updatePatient = async (req: Request, res: Response) => {
   try {
-    let patient = await Patient.findById(req.params.id);
-    if (!patient) {
-      patient = await Patient.findOne({ patientId: req.params.id });
-    }
+    const patient = await findPatientSafely(req.params.id);
     if (!patient) {
       return res.status(404).json({ success: false, error: 'Patient not found' });
     }

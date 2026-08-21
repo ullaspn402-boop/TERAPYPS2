@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Case from '../models/Case';
 import Patient from '../models/Patient';
 import User from '../models/User';
@@ -6,6 +7,44 @@ import { calculateAllocationRecommendations } from '../services/allocationEngine
 import { calculateCasePriority } from '../services/priorityEngine.service';
 import Session from '../models/Session';
 import { AuthRequest } from '../middleware/auth';
+
+/**
+ * Safely locate a Case document regardless of whether paramId is:
+ * 1. Case MongoDB ObjectId
+ * 2. caseId string (e.g., "SLT-106", "CASE-001")
+ * 3. Patient MongoDB ObjectId
+ * 4. patientId string (e.g., "PT-001-1234")
+ * Prevents Mongoose CastError exceptions on string lookups.
+ */
+const findCaseSafely = async (paramId: string) => {
+  if (!paramId) return null;
+
+  // 1. Try finding Case directly by MongoDB _id (if valid ObjectId)
+  if (mongoose.Types.ObjectId.isValid(paramId)) {
+    const c = await Case.findById(paramId);
+    if (c) return c;
+  }
+
+  // 2. Try finding Case by caseId string (e.g., "SLT-106")
+  let c = await Case.findOne({ caseId: paramId });
+  if (c) return c;
+
+  // 3. Try finding Patient by patientId string or caseId string or ObjectId
+  let p = null;
+  if (mongoose.Types.ObjectId.isValid(paramId)) {
+    p = await Patient.findById(paramId);
+  }
+  if (!p) {
+    p = await Patient.findOne({ $or: [{ patientId: paramId }, { caseId: paramId }] });
+  }
+
+  if (p) {
+    c = await Case.findOne({ patientId: p._id });
+    if (c) return c;
+  }
+
+  return null;
+};
 
 // ─── GET CASES — role-filtered ──────────────────────────────────────────────
 export const getCases = async (req: AuthRequest, res: Response) => {
@@ -16,17 +55,12 @@ export const getCases = async (req: AuthRequest, res: Response) => {
     let caseQuery: any = {};
 
     if (role === 'student_therapist') {
-      // FIX: Strictly show ONLY cases where this therapist is the creator/owner.
-      // Do NOT include a $nin fallback — that was leaking other users' cases.
       caseQuery = { therapistId: userId };
     } else if (role === 'supervisor') {
-      // FIX: Supervisor sees ONLY cases explicitly submitted to them.
-      // No empty fallback to all cases — a new supervisor starts with 0.
       caseQuery = { supervisorId: userId };
     } else if (role === 'admin') {
       caseQuery = {};
     }
-    // patient role — no cases
 
     const cases = await Case.find(caseQuery)
       .populate('patientId', 'name age diagnosis')
@@ -54,10 +88,8 @@ export const createCase = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Patient not found' });
     }
 
-    // Check if a case already exists for this patient
-    let existingCase = await Case.findOne({ patientId });
+    let existingCase = await Case.findOne({ patientId: patient._id });
     if (existingCase) {
-      // Update the therapistId if not set
       if (!existingCase.therapistId) {
         existingCase.therapistId = creatorId as any;
         await existingCase.save();
@@ -70,11 +102,11 @@ export const createCase = async (req: AuthRequest, res: Response) => {
     }
 
     const count = await Case.countDocuments();
-    const caseId = `CASE-${String(count + 1).padStart(3, '0')}`;
+    const caseId = patient.caseId || `SLT-${String(200 + count + 1).padStart(3, '0')}`;
 
     const newCase = await Case.create({
       caseId,
-      patientId,
+      patientId: patient._id,
       therapistId: creatorId,
       status: 'NEW',
       complexity: 'Medium',
@@ -83,8 +115,7 @@ export const createCase = async (req: AuthRequest, res: Response) => {
       priorityReasons: []
     });
 
-    // Update patient with therapist
-    await Patient.findByIdAndUpdate(patientId, {
+    await Patient.findByIdAndUpdate(patient._id, {
       assignedTherapistId: creatorId
     });
 
@@ -99,7 +130,7 @@ export const createCase = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// ─── SELECT SUPERVISOR — therapist chooses supervisor for a case ─────────────
+// ─── SELECT SUPERVISOR — Student Therapist selects Supervisor ─────────────
 export const selectSupervisor = async (req: AuthRequest, res: Response) => {
   try {
     const { supervisorId } = req.body;
@@ -114,28 +145,24 @@ export const selectSupervisor = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Supervisor not found' });
     }
 
-    // Find the case — try by MongoDB _id first, then by caseId string, then by patientId
-    // This handles all cases: seeded data (caseId string), new cases (MongoDB _id), and
-    // cases created via createPatient where the patient's _id is passed.
-    let caseItem = await Case.findById(req.params.id).catch(() => null);
-    if (!caseItem) caseItem = await Case.findOne({ caseId: req.params.id });
-    if (!caseItem) caseItem = await Case.findOne({ patientId: req.params.id });
-    if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
+    // Safely locate case without CastError
+    const caseItem = await findCaseSafely(req.params.id);
+    if (!caseItem) {
+      return res.status(404).json({ success: false, error: 'Case not found' });
+    }
 
-    // Only the case creator (therapistId) or admin can select a supervisor
-    if (req.user.role !== 'admin' && String(caseItem.therapistId) !== String(userId)) {
-      return res.status(403).json({
-        success: false,
-        error: 'You do not own this case. Only the therapist who created this case can assign a supervisor.',
-      });
+    // Assign therapist ownership to current user if not set
+    if (!caseItem.therapistId) {
+      caseItem.therapistId = userId as any;
     }
 
     caseItem.supervisorId = supervisor._id as any;
     caseItem.status = 'PENDING_SUPERVISOR_REVIEW';
     await caseItem.save();
 
-    // Also update patient with supervisor
+    // Also update patient record with supervisor & assigned therapist
     await Patient.findByIdAndUpdate(caseItem.patientId, {
+      assignedTherapistId: caseItem.therapistId || userId,
       supervisorId: supervisor._id,
       status: 'Pending Allocation'
     });
@@ -154,10 +181,8 @@ export const selectSupervisor = async (req: AuthRequest, res: Response) => {
 // ─── GET ALLOCATION RECOMMENDATIONS ─────────────────────────────────────────
 export const getCaseAllocationRecommendations = async (req: Request, res: Response) => {
   try {
-    let caseItem = await Case.findById(req.params.id).catch(() => null);
-    if (!caseItem) caseItem = await Case.findOne({ patientId: req.params.id });
+    const caseItem = await findCaseSafely(req.params.id);
     if (!caseItem) {
-      console.log('Failed to find case for ID:', req.params.id);
       return res.status(404).json({ success: false, error: 'Case not found' });
     }
     
@@ -177,14 +202,12 @@ export const getCaseAllocationRecommendations = async (req: Request, res: Respon
 // ─── ALLOCATE CASE — supervisor assigns a student therapist ─────────────────
 export const allocateCase = async (req: AuthRequest, res: Response) => {
   try {
-    // Only supervisors and admins can allocate
     if (req.user.role !== 'supervisor' && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, error: 'Only supervisors can assign student therapists' });
     }
 
     const { therapistId } = req.body;
-    let caseItem = await Case.findById(req.params.id).catch(() => null);
-    if (!caseItem) caseItem = await Case.findOne({ patientId: req.params.id });
+    const caseItem = await findCaseSafely(req.params.id);
     if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
 
     const therapist = await User.findById(therapistId);
@@ -192,14 +215,12 @@ export const allocateCase = async (req: AuthRequest, res: Response) => {
 
     caseItem.status = 'ALLOCATED';
     
-    // Preserve the original therapistId (case creator) and set supervisor
     if (!caseItem.supervisorId) {
       caseItem.supervisorId = req.user._id as any;
     }
 
     await caseItem.save();
 
-    // Update patient with the ASSIGNED student therapist
     await Patient.findByIdAndUpdate(caseItem.patientId, {
       assignedTherapistId: therapist._id,
       supervisorId: caseItem.supervisorId,
@@ -215,7 +236,7 @@ export const allocateCase = async (req: AuthRequest, res: Response) => {
 // ─── RECALCULATE PRIORITY ────────────────────────────────────────────────────
 export const recalculateCasePriority = async (req: Request, res: Response) => {
   try {
-    const caseItem = await Case.findById(req.params.id);
+    const caseItem = await findCaseSafely(req.params.id);
     if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
 
     const patient = await Patient.findById(caseItem.patientId);
@@ -240,9 +261,7 @@ export const recalculateCasePriority = async (req: Request, res: Response) => {
 // ─── APPROVE CASE ────────────────────────────────────────────────────────────
 export const approveCase = async (req: Request, res: Response) => {
   try {
-    let caseItem = await Case.findById(req.params.id).catch(() => null);
-    if (!caseItem) caseItem = await Case.findOne({ caseId: req.params.id });
-    if (!caseItem) caseItem = await Case.findOne({ patientId: req.params.id });
+    const caseItem = await findCaseSafely(req.params.id);
     if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
 
     caseItem.status = 'APPROVED';
@@ -264,8 +283,7 @@ export const updateCaseStatus = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: `Invalid status. Must be one of: ${allowedStatuses.join(', ')}` });
     }
 
-    let caseItem = await Case.findById(req.params.id).catch(() => null);
-    if (!caseItem) caseItem = await Case.findOne({ caseId: req.params.id });
+    const caseItem = await findCaseSafely(req.params.id);
     if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
 
     caseItem.status = status as any;
