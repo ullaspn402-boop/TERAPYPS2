@@ -1,0 +1,684 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiClient } from '../api/client';
+import {
+  UserRole,
+  Patient,
+  SessionRecord,
+  SupervisorPriorityCase,
+  StudentCompetencyItem,
+  NotificationItem,
+  AIActivitySuggestion,
+  TherapyLevel,
+} from '../types';
+import { INITIAL_PATIENTS } from '../data/mockData';
+
+export type NavigationPage =
+  | 'landing'
+  | 'dashboard'
+  | 'my-cases'
+  | 'patients'
+  | 'patient-detail'
+  | 'therapy-sessions'
+  | 'speech-practice'
+  | 'progress'
+  | 'reports'
+  | 'ai-assistant'
+  | 'adaptive-therapy'
+  | 'ai-insights'
+  | 'supervisor-center'
+  | 'therapy-plans'
+  | 'reviews'
+  | 'student-competency'
+  | 'ai-allocation'
+  | 'analytics'
+  | 'users'
+  | 'settings';
+
+export type PatientTab =
+  | 'overview'
+  | 'assessment'
+  | 'therapy-plan'
+  | 'sessions'
+  | 'speech-analysis'
+  | 'progress'
+  | 'reports';
+
+export interface DashboardStats {
+  activeCases: number;
+  sessionsThisWeek: number;
+  plansAwaitingReview: number;
+  reportsDue: number;
+  highPriority: number;
+  amberPriority: number;
+  normalPriority: number;
+  totalCases: number;
+  avgProgress: number;
+  avgSupervisorRating: number;
+  langDistribution: { language: string; count: number; percent: number }[];
+  phonemeProgress: { sound: string; avgBaseline: number; avgCurrent: number; count: number }[];
+}
+
+interface AppContextType {
+  role: UserRole;
+  setRole: (role: UserRole) => void;
+  currentUser: { name: string; role: string; avatarType?: string } | null;
+  isAuthenticated: boolean;
+  login: (token: string, user: any) => void;
+  logout: () => void;
+  currentView: NavigationPage;
+  setCurrentView: (view: NavigationPage) => void;
+  selectedPatientId: string;
+  setSelectedPatientId: (id: string) => void;
+  selectedPatientTab: PatientTab;
+  setSelectedPatientTab: (tab: PatientTab) => void;
+  interfaceLanguage: string;
+  setInterfaceLanguage: (lang: string) => void;
+  isSearchOpen: boolean;
+  setIsSearchOpen: (open: boolean) => void;
+  isNotificationOpen: boolean;
+  setIsNotificationOpen: (open: boolean) => void;
+  patients: Patient[];
+  selectedPatient: Patient;
+  sessionRecords: SessionRecord[];
+  supervisorCases: SupervisorPriorityCase[];
+  studentCompetencies: StudentCompetencyItem[];
+  notifications: NotificationItem[];
+  aiActivities: AIActivitySuggestion[];
+  unreadNotificationCount: number;
+  dashboardStats: DashboardStats;
+  isLoading: boolean;
+  // State modification actions
+  navigateToPatient: (patientId: string, tab?: PatientTab) => void;
+  updatePatientGoals: (patientId: string, goals: Patient['goals']) => void;
+  advanceTherapyLevel: (patientId: string, newLevel: TherapyLevel) => void;
+  addSessionRecord: (newSession: SessionRecord) => void;
+  addPatient: (data: {
+    name: string; age: number; gender: string;
+    primaryLanguage: string; therapyLanguage: string;
+    targetSound: string; diagnosis: string; initialNotes?: string;
+  }) => Promise<void>;
+  updateAIActivityStatus: (activityId: string, status: 'approved' | 'modified' | 'rejected') => void;
+  approveSupervisorCase: (caseId: string, feedback: string) => void;
+  markNotificationAsRead: (notificationId: string) => void;
+  markAllNotificationsAsRead: () => void;
+  allocateCaseToTherapist: (patientId: string, therapistId: string) => void;
+}
+
+const defaultDashboardStats: DashboardStats = {
+  activeCases: 0,
+  sessionsThisWeek: 0,
+  plansAwaitingReview: 0,
+  reportsDue: 0,
+  highPriority: 0,
+  amberPriority: 0,
+  normalPriority: 0,
+  totalCases: 0,
+  avgProgress: 0,
+  avgSupervisorRating: 0,
+  langDistribution: [],
+  phonemeProgress: [],
+};
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [role, setRoleState] = useState<UserRole>('student_therapist');
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: string; avatarType?: string } | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentView, setCurrentView] = useState<NavigationPage>('dashboard');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [selectedPatientTab, setSelectedPatientTab] = useState<PatientTab>('overview');
+  const [interfaceLanguage, setInterfaceLanguageState] = useState<string>(
+    localStorage.getItem('speechcare_lang') || 'en'
+  );
+  const setInterfaceLanguage = (lang: string) => {
+    localStorage.setItem('speechcare_lang', lang);
+    setInterfaceLanguageState(lang);
+  };
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // All state initialized as empty — populated from backend on login
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
+  const [supervisorCases, setSupervisorCases] = useState<SupervisorPriorityCase[]>([]);
+  const [studentCompetencies, setStudentCompetencies] = useState<StudentCompetencyItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [aiActivities, setAiActivities] = useState<AIActivitySuggestion[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>(defaultDashboardStats);
+
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId) || patients[0] || INITIAL_PATIENTS[0];
+  const unreadNotificationCount = notifications.filter((n) => n.unread).length;
+
+  // ─── Fetch Sessions ────────────────────────────────────────────────────────
+
+  const fetchSessionsForPatient = async (patientId: string) => {
+    if (!patientId) return;
+
+    try {
+      const res = await apiClient.get(`/sessions/patient/${patientId}`);
+      if (res.success && Array.isArray(res.data)) {
+        const targetPatient = patients.find((p) => p.id === patientId);
+        const mappedSessions: SessionRecord[] = res.data.map((dbS: any) => ({
+          id: dbS._id,
+          patientId: patientId,
+          patientName: dbS.patientId?.name || targetPatient?.name || 'Patient',
+          sessionNumber: dbS.sessionNumber,
+          date: dbS.date
+            ? new Date(dbS.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+            : 'Recent',
+          durationMinutes: dbS.durationMinutes || 45,
+          therapistName: dbS.therapistId?.name || 'Ananya Sharma',
+          level: dbS.level || 'Sentence',
+          targetSound: dbS.targetSound || '/r/',
+          speechPerformanceScore: dbS.speechPerformanceScore || 0,
+          phonemeAccuracyScore: dbS.phonemeAccuracyScore || 0,
+          audioQuality: dbS.audioQuality || 'Good',
+          stimulusItems: (dbS.stimulusItems || []).map((item: any) => ({
+            prompt: item.prompt,
+            score: item.score,
+            phonemeResult: item.phonemeResult,
+          })),
+          soapNotes: {
+            subjective: dbS.soapNotes?.subjective || '',
+            objective: dbS.soapNotes?.objective || '',
+            assessment: dbS.soapNotes?.assessment || '',
+            plan: dbS.soapNotes?.plan || '',
+          },
+          supervisorFeedback: dbS.supervisorFeedback?.comment
+            ? {
+                supervisorName: dbS.supervisorFeedback.supervisorId?.name || 'Supervisor',
+                comment: dbS.supervisorFeedback.comment,
+                rating: dbS.supervisorFeedback.rating || 5,
+                date: dbS.supervisorFeedback.date
+                  ? new Date(dbS.supervisorFeedback.date).toISOString().split('T')[0]
+                  : '',
+              }
+            : undefined,
+        }));
+        setSessionRecords(mappedSessions);
+      } else {
+        setSessionRecords([]);
+      }
+    } catch (e) {
+      console.error('Failed to load sessions from DB:', e);
+      setSessionRecords([]);
+    }
+  };
+
+  // ─── Fetch Notifications ───────────────────────────────────────────────────
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await apiClient.get('/notifications');
+      if (res.success && Array.isArray(res.data)) {
+        setNotifications(res.data);
+      }
+    } catch (e) {
+      // Notifications are non-critical; silently fail
+      console.warn('Could not load notifications:', e);
+      setNotifications([]);
+    }
+  };
+
+  // ─── Fetch Student Competencies ────────────────────────────────────────────
+
+  const fetchStudentCompetencies = async () => {
+    try {
+      const therapistsRes = await apiClient.get('/users/therapists');
+      if (!therapistsRes.success || !Array.isArray(therapistsRes.data)) return;
+
+      const competencies: StudentCompetencyItem[] = await Promise.all(
+        therapistsRes.data.map(async (t: any, idx: number) => {
+          let metrics = { planning: 0, goalSetting: 0, documentation: 0, sessionHandling: 0, supervisorRating: 0 };
+          let overallAverage = 0;
+          let feedbackNotes = 'No evaluations recorded yet.';
+
+          try {
+            const compRes = await apiClient.get(`/users/therapists/${t._id}/competency`);
+            if (compRes.success && compRes.data) {
+              const d = compRes.data;
+              metrics = {
+                planning: d.planning || 0,
+                goalSetting: d.goalSetting || 0,
+                documentation: d.documentation || 0,
+                sessionHandling: d.sessionHandling || 0,
+                supervisorRating: d.clinicalReasoning || 0,
+              };
+              const vals = Object.values(metrics) as number[];
+              overallAverage = vals.length > 0
+                ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+                : 0;
+            }
+          } catch (e) {
+            // Competency fetch for one therapist failed; keep defaults
+          }
+
+          const activeCasesCount = t.activeCaseload || 0;
+
+          return {
+            id: t._id,
+            studentName: t.name,
+            studentId: `ST-${String(idx + 1).padStart(4, '0')}`,
+            avatarType: t.avatarType,
+            yearOfStudy: t.experienceYears
+              ? `Year ${Math.ceil(t.experienceYears)} (Clinical Practicum)`
+              : 'Year 1 (Practicum)',
+            supervisor: t.supervisorId?.name || 'Supervisor',
+            activeCasesCount,
+            metrics,
+            overallAverage,
+            trend: '+0%' as any,
+            historicalTrend: [],
+            feedbackNotes,
+          };
+        })
+      );
+
+      setStudentCompetencies(competencies);
+    } catch (e) {
+      console.warn('Could not load student competencies:', e);
+    }
+  };
+
+  // ─── Fetch Analytics Summary ───────────────────────────────────────────────
+
+  const fetchAnalytics = async () => {
+    try {
+      const res = await apiClient.get('/analytics/summary');
+      if (res.success && res.data) {
+        const d = res.data;
+        setDashboardStats({
+          activeCases: d.cases?.active || 0,
+          sessionsThisWeek: d.sessions?.thisWeek || 0,
+          plansAwaitingReview: d.plansAwaitingReview || 0,
+          reportsDue: d.reports?.due || 0,
+          highPriority: d.cases?.highPriority || 0,
+          amberPriority: d.cases?.amberPriority || 0,
+          normalPriority: d.cases?.normalPriority || 0,
+          totalCases: d.cases?.total || 0,
+          avgProgress: d.patients?.avgProgress || 0,
+          avgSupervisorRating: d.avgSupervisorRating || 0,
+          langDistribution: d.langDistribution || [],
+          phonemeProgress: d.phonemeProgress || [],
+        });
+      }
+    } catch (e) {
+      console.warn('Could not load analytics:', e);
+    }
+  };
+
+  // ─── Main data fetch (runs on login and token restore) ────────────────────
+
+  const fetchDbData = async () => {
+    setIsLoading(true);
+    try {
+      // Patients
+      const res = await apiClient.get('/patients');
+      if (res.success && res.data && res.data.length > 0) {
+        const mapped = res.data.map((dbP: any) => ({
+          ...dbP,
+          id: dbP._id,
+          assignedTherapist: dbP.assignedTherapistId
+            ? {
+                id: dbP.assignedTherapistId._id,
+                name: dbP.assignedTherapistId.name,
+                role: dbP.assignedTherapistId.role,
+                avatarType: dbP.assignedTherapistId.avatarType,
+              }
+            : undefined,
+          supervisor: dbP.supervisorId
+            ? {
+                id: dbP.supervisorId._id,
+                name: dbP.supervisorId.name,
+                title: dbP.supervisorId.title,
+                avatarType: dbP.supervisorId.avatarType,
+              }
+            : undefined,
+        }));
+        setPatients(mapped);
+
+        // Ensure first patient is selected
+        const firstPatient = mapped[0];
+        if (firstPatient) {
+          setSelectedPatientId((prev) => prev || firstPatient.id);
+          fetchSessionsForPatient(firstPatient.id);
+        }
+      } else {
+        setPatients(INITIAL_PATIENTS);
+        setSelectedPatientId(INITIAL_PATIENTS[0].id);
+        fetchSessionsForPatient(INITIAL_PATIENTS[0].id);
+      }
+
+      // Cases → supervisor priority queue
+      const casesRes = await apiClient.get('/cases');
+      if (casesRes.success && casesRes.data) {
+        const mappedCases = casesRes.data.map((c: any) => ({
+          id: c._id,
+          caseId: c.caseId,
+          patientId: c.patientId?._id || c.patientId,
+          patientName: c.patientId?.name || 'Unknown',
+          assignedTherapist: c.therapistId?.name || 'Unassigned',
+          priority: c.priority || 'Normal',
+          priorityScore: c.priorityScore || 0,
+          headline: c.priorityReasons?.[0] || (c.status ? c.status.replace(/_/g, ' ') : 'Active Case'),
+          reason: (c.priorityReasons || []).join('. ') || 'Case is currently active.',
+          lastSessionDate: 'Recent',
+          sessionsCompleted: c.patientId?.sessionCount || 0,
+          conversationScore: c.patientId?.currentScores?.conversation || 0,
+          reportPending: c.status === 'MILESTONE_DUE' || c.status === 'PROGRESS_REVIEW',
+          statusText: c.status === 'APPROVED'
+            ? 'Approved & Signed Off'
+            : (c.status ? c.status.replace(/_/g, ' ') : 'Unknown'),
+          reasons: c.priorityReasons || [],
+        }));
+        setSupervisorCases(mappedCases);
+      }
+
+      // AI Activities
+      const aiRes = await apiClient.get('/ai/activities');
+      if (aiRes.success && Array.isArray(aiRes.data) && aiRes.data.length > 0) {
+        const mappedActivities: AIActivitySuggestion[] = aiRes.data.map((dbAct: any) => ({
+          id: dbAct.activityId || dbAct._id,
+          title: dbAct.title,
+          level: dbAct.level,
+          description: dbAct.description,
+          clinicalRationale: dbAct.clinicalRationale,
+          targetPhoneme: dbAct.targetPhoneme,
+          recommendedDuration: dbAct.recommendedDuration,
+          status: dbAct.status,
+        }));
+        setAiActivities(mappedActivities);
+      }
+
+      // Run remaining fetches in parallel (non-critical)
+      await Promise.allSettled([
+        fetchNotifications(),
+        fetchStudentCompetencies(),
+        fetchAnalytics(),
+      ]);
+    } catch (e) {
+      console.error('Failed to load data from DB:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ─── Auth ──────────────────────────────────────────────────────────────────
+
+  const login = (token: string, user: any) => {
+    if (!token) {
+      console.error('Login called without a valid token');
+      return;
+    }
+    localStorage.setItem('speechcare_token', token);
+    setRoleState(user.role as UserRole);
+    setCurrentUser({ name: user.name, role: user.role, avatarType: user.avatarType });
+    setIsAuthenticated(true);
+    fetchDbData();
+
+    if (user.role === 'supervisor') {
+      setCurrentView('supervisor-center');
+    } else if (user.role === 'admin') {
+      setCurrentView('analytics');
+    } else {
+      setCurrentView('dashboard');
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('speechcare_token');
+    setIsAuthenticated(false);
+    setRoleState('student_therapist');
+    setCurrentUser(null);
+    setCurrentView('dashboard');
+    // Clear state
+    setPatients([]);
+    setSessionRecords([]);
+    setSupervisorCases([]);
+    setStudentCompetencies([]);
+    setNotifications([]);
+    setAiActivities([]);
+    setDashboardStats(defaultDashboardStats);
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem('speechcare_token');
+    if (token && token !== 'undefined' && token !== 'null') {
+      apiClient
+        .get('/auth/me')
+        .then((res) => {
+          if (res.success && res.data) {
+            setRoleState(res.data.role as UserRole);
+            setCurrentUser({ name: res.data.name, role: res.data.role, avatarType: res.data.avatarType });
+            setIsAuthenticated(true);
+            fetchDbData();
+          } else {
+            logout();
+          }
+        })
+        .catch((e) => {
+          if (
+            e.message &&
+            (e.message.includes('token') ||
+              e.message.includes('Authentication') ||
+              e.message.includes('401'))
+          ) {
+            logout();
+          }
+        });
+    } else {
+      localStorage.removeItem('speechcare_token');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && selectedPatientId) {
+      fetchSessionsForPatient(selectedPatientId);
+    }
+  }, [selectedPatientId, isAuthenticated]);
+
+  const setRole = (newRole: UserRole) => {
+    console.warn('setRole is disabled. Role is determined by the backend token.');
+  };
+
+  // ─── Navigation ────────────────────────────────────────────────────────────
+
+  const navigateToPatient = (patientId: string, tab: PatientTab = 'overview') => {
+    const target = patients.find((p) => p.id === patientId);
+    const actualId = target ? target.id : patientId;
+    setSelectedPatientId(actualId);
+    setSelectedPatientTab(tab);
+    setCurrentView('patient-detail');
+    fetchSessionsForPatient(actualId);
+  };
+
+  // ─── Data Mutations ────────────────────────────────────────────────────────
+
+  const updatePatientGoals = async (patientId: string, goals: Patient['goals']) => {
+    const target = patients.find((p) => p.id === patientId);
+    const actualId = target ? target.id : patientId;
+
+    try {
+      const res = await apiClient.put(`/patients/${actualId}`, { goals });
+      if (res.success) {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === actualId ? { ...p, goals } : p))
+        );
+      }
+    } catch (e) {
+      console.error('Failed to update patient goals in DB:', e);
+    }
+  };
+
+  const advanceTherapyLevel = async (patientId: string, newLevel: TherapyLevel) => {
+    const target = patients.find((p) => p.id === patientId);
+    const actualId = target ? target.id : patientId;
+
+    try {
+      const res = await apiClient.put(`/patients/${actualId}`, { currentLevel: newLevel });
+      if (res.success) {
+        setPatients((prev) =>
+          prev.map((p) => (p.id === actualId ? { ...p, currentLevel: newLevel } : p))
+        );
+      }
+    } catch (e) {
+      console.error('Failed to advance therapy level in DB:', e);
+    }
+  };
+
+  const addSessionRecord = async (newSession: SessionRecord) => {
+    try {
+      const res = await apiClient.post('/sessions', newSession);
+      if (res.success) {
+        await fetchSessionsForPatient(selectedPatient?.id || '');
+        await fetchAnalytics();
+      }
+    } catch (e) {
+      console.error('Failed to add session record', e);
+    }
+  };
+
+  const addPatient = async (data: {
+    name: string; age: number; gender: string;
+    primaryLanguage: string; therapyLanguage: string;
+    targetSound: string; diagnosis: string; initialNotes?: string;
+  }) => {
+    try {
+      const res = await apiClient.post('/patients', data);
+      if (res.success && res.data) {
+        const newP = {
+          ...res.data,
+          id: res.data._id,
+          assignedTherapist: undefined,
+          supervisor: undefined,
+        };
+        setPatients(prev => [newP, ...prev]);
+        setSelectedPatientId(newP.id);
+        setCurrentView('patient-detail');
+      }
+    } catch (e) {
+      console.error('Failed to add patient:', e);
+    }
+  };
+
+  const updateAIActivityStatus = async (
+    activityId: string,
+    status: 'approved' | 'modified' | 'rejected'
+  ) => {
+    try {
+      const res = await apiClient.put(`/ai/activities/${activityId}`, { status });
+      if (res.success) {
+        setAiActivities((prev) =>
+          prev.map((act) => (act.id === activityId ? { ...act, status } : act))
+        );
+      }
+    } catch (e) {
+      console.error('Failed to update AI activity status in DB:', e);
+    }
+  };
+
+  const approveSupervisorCase = async (caseId: string, feedback: string) => {
+    try {
+      const res = await apiClient.post(`/cases/${caseId}/approve`);
+      if (res.success) {
+        setSupervisorCases((prev) =>
+          prev.map((sc) =>
+            sc.caseId === caseId || sc.id === caseId
+              ? { ...sc, statusText: 'Approved & Signed Off', priority: 'Normal' }
+              : sc
+          )
+        );
+      }
+    } catch (e) {
+      console.error('Failed to approve supervisor case in DB:', e);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    // Optimistic UI update
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, unread: false } : n))
+    );
+    try {
+      await apiClient.put(`/notifications/${notificationId}/read`);
+    } catch (e) {
+      // Non-critical — optimistic update already applied
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    // Optimistic UI update
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    try {
+      await apiClient.put('/notifications/read-all');
+    } catch (e) {
+      // Non-critical
+    }
+  };
+
+  const allocateCaseToTherapist = async (patientId: string, therapistId: string) => {
+    try {
+      await apiClient.post(`/cases/${patientId}/allocate`, { therapistId });
+      fetchDbData();
+    } catch (e) {
+      console.error('Failed to allocate case', e);
+    }
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        role,
+        setRole,
+        currentUser,
+        isAuthenticated,
+        login,
+        logout,
+        currentView,
+        setCurrentView,
+        selectedPatientId,
+        setSelectedPatientId,
+        selectedPatientTab,
+        setSelectedPatientTab,
+        interfaceLanguage,
+        setInterfaceLanguage,
+        isSearchOpen,
+        setIsSearchOpen,
+        isNotificationOpen,
+        setIsNotificationOpen,
+        patients,
+        selectedPatient,
+        sessionRecords,
+        supervisorCases,
+        studentCompetencies,
+        notifications,
+        aiActivities,
+        unreadNotificationCount,
+        dashboardStats,
+        isLoading,
+        navigateToPatient,
+        updatePatientGoals,
+        advanceTherapyLevel,
+        addSessionRecord,
+        addPatient,
+        updateAIActivityStatus,
+        approveSupervisorCase,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        allocateCaseToTherapist,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};

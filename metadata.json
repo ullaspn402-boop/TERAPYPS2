@@ -1,0 +1,6 @@
+{
+  "name": "SPEECHCARE AI",
+  "description": "Intelligent Speech Therapy & Clinical Supervision Platform with acoustic analysis, adaptive progression, and AI clinical assistant.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_LOCAL_RULE_BASED_AI"]
+}

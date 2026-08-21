@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary-navy: #041627;
+    --primary-navy-dark: #020C17;
+    --navy-surface: #1A2B3C;
+    --teal-primary: #006A61;
+    --teal-dark: #005049;
+    --teal-light: #E0F2F1;
+    --teal-glow: #86F2E4;
+    --surface-bg: #F8FAFC;
+    --surface-card: #FFFFFF;
+    --surface-border: #E2E8F0;
+    --text-main: #191C1E;
+    --text-muted: #44474C;
+    --warning-amber: #D97706;
+    --warning-bg: #FEF3C7;
+    --danger-red: #BA1A1A;
+    --danger-bg: #FFDAD6;
+  }
+
+  body {
+    font-family: 'Geist', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #F8FAFC;
+    color: #191C1E;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Custom clinical scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Material symbols utility */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+.material-symbols-outlined.fill-1 {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Audio wave animation pulse */
+@keyframes soundwave {
+  0%, 100% { height: 6px; }
+  50% { height: 32px; }
+}
+
+.animate-soundwave-1 { animation: soundwave 1.1s ease-in-out infinite 0.1s; }
+.animate-soundwave-2 { animation: soundwave 0.9s ease-in-out infinite 0.25s; }
+.animate-soundwave-3 { animation: soundwave 1.3s ease-in-out infinite 0.4s; }
+.animate-soundwave-4 { animation: soundwave 0.8s ease-in-out infinite 0.15s; }
+.animate-soundwave-5 { animation: soundwave 1.4s ease-in-out infinite 0.3s; }
+.animate-soundwave-6 { animation: soundwave 1.0s ease-in-out infinite 0.5s; }
+.animate-soundwave-7 { animation: soundwave 1.2s ease-in-out infinite 0.2s; }
+.animate-soundwave-8 { animation: soundwave 0.7s ease-in-out infinite 0.45s; }
+
+/* ─── Clinical Report Print / PDF Export Styles ─── */
+@media print {
+  /* Hide web-only controls, navigation, sidebars, headers, action buttons, modals, drawers */
+  aside,
+  header,
+  nav,
+  button,
+  .no-print,
+  .global-search-modal,
+  .notification-drawer {
+    display: none !important;
+  }
+
+  /* Force print-only elements to show */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Reset document background & layout for professional print */
+  html,
+  body {
+    background: #ffffff !important;
+    color: #191c1e !important;
+    font-size: 11pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .min-h-screen,
+  .flex-1 {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Ensure card backgrounds and borders print clearly */
+  .bg-white,
+  .bg-[#041627],
+  .bg-[#F8FAFC],
+  .bg-[#E0F2F1] {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border-color: #e2e8f0 !important;
+  }
+
+  /* High legibility text */
+  h1, h2, h3, h4, h5, h6, p, span, li, td, th, div {
+    color: #000000 !important;
+  }
+
+  /* Page break rules */
+  .print-break-inside-avoid,
+  .rounded-xl,
+  .rounded-2xl {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
