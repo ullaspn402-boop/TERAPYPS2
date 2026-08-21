@@ -23,7 +23,8 @@ import {
   Edit3,
   Globe,
   Send,
-  XCircle
+  XCircle,
+  Trash2
 } from 'lucide-react';
 import { useApp, PatientTab } from '../../context/AppContext';
 import { TherapyGoal, SessionRecord } from '../../types';
@@ -40,6 +41,7 @@ export const PatientDetailView: React.FC = () => {
     setCurrentView,
     currentView,
     updatePatientGoals,
+    deletePatient,
     sessionRecords,
     approveSupervisorCase,
     interfaceLanguage,
@@ -239,6 +241,22 @@ export const PatientDetailView: React.FC = () => {
                 Discontinue
               </button>
             </div>
+          )}
+
+          {role === 'admin' && (
+            <button
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to delete patient account "${selectedPatient.name}" (${selectedPatient.caseId})?`)) {
+                  deletePatient(selectedPatient.id);
+                  setCurrentView('patients');
+                }
+              }}
+              className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold flex items-center space-x-1.5 shadow-xs transition-colors cursor-pointer"
+              title="Delete Patient Account"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Case</span>
+            </button>
           )}
 
           {selectedPatient.status === 'Pending Allocation' && role === 'student_therapist' && (

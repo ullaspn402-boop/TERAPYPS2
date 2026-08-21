@@ -21,7 +21,7 @@ const ROLE_META: Record<string, { label: string; color: string; icon: React.Elem
 };
 
 export const AdminUsersView: React.FC = () => {
-  const { currentUser } = useApp();
+  const { currentUser, patients, deletePatient } = useApp();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -270,6 +270,52 @@ export const AdminUsersView: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* ── Registered Student Clearance Section for Trial Management ── */}
+      <div className="mt-10 pt-6 border-t border-white/10 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-[#006A61]" />
+              <span>Registered Student Cases ({patients.length})</span>
+            </h2>
+            <p className="text-xs text-slate-400">Manage and clear test or trial student accounts created during practice runs</p>
+          </div>
+        </div>
+
+        {patients.length === 0 ? (
+          <p className="text-xs text-slate-500 py-4">No registered student accounts in system.</p>
+        ) : (
+          <div className="space-y-2">
+            {patients.map(p => (
+              <div key={p.id} className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05]">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-white">{p.name}</span>
+                    <span className="text-xs text-teal-400 font-mono">({p.caseId})</span>
+                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">Target: {p.targetSound}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Language: {p.therapyLanguage} • Assigned Therapist: <strong className="text-slate-300">{p.assignedTherapist?.name || 'Unassigned'}</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete test student account "${p.name}" (${p.caseId})?`)) {
+                      deletePatient(p.id);
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Delete Student Account"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Student</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

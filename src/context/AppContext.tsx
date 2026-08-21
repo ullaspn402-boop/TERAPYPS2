@@ -97,6 +97,7 @@ interface AppContextType {
     primaryLanguage: string; therapyLanguage: string;
     targetSound: string; diagnosis: string; initialNotes?: string;
   }) => Promise<void>;
+  deletePatient: (patientId: string) => Promise<void>;
   updateAIActivityStatus: (activityId: string, status: 'approved' | 'modified' | 'rejected') => void;
   approveSupervisorCase: (caseId: string, feedback: string) => void;
   markNotificationAsRead: (notificationId: string) => void;
@@ -546,6 +547,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     targetSound: string; diagnosis: string; initialNotes?: string;
   }) => {
     const tempId = 'p-' + Date.now();
+    const assignedTherapistObj = currentUser
+      ? {
+          id: currentUser.name.toLowerCase().replace(/\s+/g, '-'),
+          name: currentUser.name,
+          role: currentUser.role === 'student_therapist' ? 'Student Therapist' : 'Therapist',
+        }
+      : { id: 't1', name: 'Student Therapist', role: 'Student Therapist' };
+
     const newP: Patient = {
       id: tempId,
       caseId: `SLT-${Math.floor(100 + Math.random() * 900)}`,
@@ -561,11 +570,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       progressPct: 0,
       status: 'Pending Allocation',
       priority: 'Normal',
-      assignedTherapist: {
-        id: 't1',
-        name: 'Unassigned',
-        role: 'Student Therapist',
-      },
+      assignedTherapist: assignedTherapistObj,
       supervisor: {
         id: 's1',
         name: 'Dr. Sarah Mehta',
@@ -613,6 +618,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (e) {
       console.warn('Backend sync note (patient preserved locally):', e);
+    }
+  };
+
+  const deletePatient = async (patientId: string) => {
+    setPatients(prev => prev.filter(p => p.id !== patientId));
+    if (selectedPatientId === patientId) {
+      setSelectedPatientId(null);
+    }
+    try {
+      await apiClient.delete(`/patients/${patientId}`);
+    } catch (e) {
+      console.warn('Backend sync note (delete patient):', e);
     }
   };
 
@@ -716,6 +733,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         advanceTherapyLevel,
         addSessionRecord,
         addPatient,
+        deletePatient,
         updateAIActivityStatus,
         approveSupervisorCase,
         markNotificationAsRead,

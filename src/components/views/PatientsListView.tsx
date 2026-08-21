@@ -1,6 +1,6 @@
 import { Avatar } from '../common/Avatar';
 import React, { useState } from 'react';
-import { Search, Plus, ChevronRight, X, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Search, Plus, ChevronRight, X, AlertCircle, ShieldCheck, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SupervisorSelectionModal } from '../therapist/SupervisorSelectionModal';
 import { Patient } from '../../types';
@@ -36,7 +36,7 @@ const emptyForm: NewPatientForm = {
   name: '',
   age: '',
   gender: 'Male',
-  primaryLanguage: 'English',
+  primaryLanguage: 'Telugu',
   therapyLanguage: 'English',
   targetSound: '/r/',
   diagnosis: 'Functional Articulation Disorder',
@@ -44,7 +44,7 @@ const emptyForm: NewPatientForm = {
 };
 
 export const PatientsListView: React.FC = () => {
-  const { patients, navigateToPatient, addPatient, setCurrentView, role } = useApp();
+  const { patients, navigateToPatient, addPatient, deletePatient, setCurrentView, role, currentUser } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [soundFilter, setSoundFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
@@ -55,6 +55,17 @@ export const PatientsListView: React.FC = () => {
   const [selectedPatientForSupervisor, setSelectedPatientForSupervisor] = useState<Patient | null>(null);
 
   const filtered = patients.filter((p) => {
+    // ── Student Therapist Isolation: Show only assigned/registered patients ──
+    if (role === 'student_therapist' && currentUser) {
+      const therapistName = (currentUser.name || '').toLowerCase().trim();
+      const patientTherapistName = (p.assignedTherapist?.name || '').toLowerCase().trim();
+      const isAssignedToMe =
+        patientTherapistName.includes(therapistName) ||
+        therapistName.includes(patientTherapistName) ||
+        p.assignedTherapist?.id === currentUser.name.toLowerCase().replace(/\s+/g, '-');
+      if (!isAssignedToMe) return false;
+    }
+
     const matchSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.caseId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -239,7 +250,22 @@ export const PatientsListView: React.FC = () => {
                   </button>
                 )}
 
-                {/* Supervisor action: Assign Student Therapist removed — Supervisor reviews existing cases */}
+                {/* Admin action: Delete Student Case */}
+                {role === 'admin' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Are you sure you want to delete registered student "${p.name}" (${p.caseId})?`)) {
+                        deletePatient(p.id);
+                      }
+                    }}
+                    className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg font-bold text-[10px] shadow-xs flex items-center gap-1"
+                    title="Delete Registered Student Account"
+                  >
+                    <Trash2 className="w-3 h-3 text-red-600" />
+                    <span>Delete</span>
+                  </button>
+                )}
 
                 <span className="text-[#006A61] font-semibold flex items-center gap-1">
                   <span>View Record</span>
