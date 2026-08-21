@@ -70,7 +70,18 @@ export const getCases = async (req: AuthRequest, res: Response) => {
     let caseQuery: any = {};
 
     if (role === 'student_therapist') {
-      caseQuery = { therapistId: userId };
+      // Student therapist sees cases where they are the case owner OR assigned therapist on patient
+      const assignedPatients = await Patient.find({ assignedTherapistId: userId }).select('_id caseId');
+      const assignedPatientIds = assignedPatients.map(p => p._id);
+      const assignedCaseIds = assignedPatients.map(p => p.caseId);
+
+      caseQuery = {
+        $or: [
+          { therapistId: userId },
+          { patientId: { $in: assignedPatientIds } },
+          { caseId: { $in: assignedCaseIds } }
+        ]
+      };
     } else if (role === 'supervisor') {
       // Supervisor sees cases explicitly submitted to them via Case.supervisorId OR Patient.supervisorId
       const supPatients = await Patient.find({ supervisorId: userId }).select('_id caseId');
@@ -116,10 +127,8 @@ export const createCase = async (req: AuthRequest, res: Response) => {
 
     let existingCase = await Case.findOne({ patientId: patient._id });
     if (existingCase) {
-      if (!existingCase.therapistId) {
-        existingCase.therapistId = creatorId as any;
-        await existingCase.save();
-      }
+      existingCase.therapistId = creatorId as any;
+      await existingCase.save();
       const populated = await Case.findById(existingCase._id)
         .populate('patientId', 'name age diagnosis')
         .populate('therapistId', 'name role')
@@ -177,18 +186,16 @@ export const selectSupervisor = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Case not found' });
     }
 
-    // Assign therapist ownership to current user if not set
-    if (!caseItem.therapistId) {
-      caseItem.therapistId = userId as any;
-    }
-
+    // FIX: Set therapistId to the current authenticated Student Therapist
+    // so the case is owned by the student therapist who submitted it.
+    caseItem.therapistId = userId as any;
     caseItem.supervisorId = supervisor._id as any;
     caseItem.status = 'PENDING_SUPERVISOR_REVIEW';
     await caseItem.save();
 
     // Also update patient record with supervisor & assigned therapist
     await Patient.findByIdAndUpdate(caseItem.patientId, {
-      assignedTherapistId: caseItem.therapistId || userId,
+      assignedTherapistId: userId,
       supervisorId: supervisor._id,
       status: 'Pending Allocation'
     });
