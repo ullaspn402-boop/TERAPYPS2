@@ -495,6 +495,8 @@ export const SpeechPracticeStudio: React.FC = () => {
         }
       }
 
+      setRecordingScore(currentScore);
+
       setAnalysisResult({
         targetSound: selectedPatient.targetSound,
         level: selectedPatient.currentLevel,
@@ -559,7 +561,12 @@ export const SpeechPracticeStudio: React.FC = () => {
   };
 
   // ── Score display helper ────────────────────────────────────────────
-  const displayScore = hasRecorded && recordingScore > 0 ? recordingScore : null;
+  const displayScore =
+    analysisState === 'complete' && analysisResult
+      ? analysisResult.prototypeScore
+      : hasRecorded && recordingScore > 0
+        ? recordingScore
+        : null;
 
   return (
     <div className="space-y-6 pb-12">
@@ -1051,12 +1058,16 @@ export const SpeechPracticeStudio: React.FC = () => {
                   ? 'F3 formant dip at 1780Hz confirms genuine rhotic retroflex tongue posture. Minimal pair cluster drills recommended next.'
                   : selectedPatient.targetSound === '/s/'
                   ? 'Central groove sibilant airstream detected. Monitor stridency consistency across positions.'
+                  : selectedPatient.targetSound === '/sh/'
+                  ? 'Palato-alveolar friction noise band (2.5–4.5 kHz) verified. Monitor lip rounding and /s/ vs /sh/ contrast.'
                   : selectedPatient.targetSound === '/l/'
                   ? 'Lateral airflow confirmed. Monitor for velarization in word-final contexts.'
                   : selectedPatient.targetSound === '/th/'
                   ? 'Interdental placement verified. Monitor for dental stop substitution in connected speech.'
                   : selectedPatient.targetSound === '/k/'
                   ? 'Velar closure contact verified. Monitor coarticulation on adjacent vowels.'
+                  : selectedPatient.targetSound === '/g/'
+                  ? 'Voiced velar stop burst confirmed. Monitor voice onset time consistency.'
                   : 'Monitor target phoneme production across all word positions.'}
               </p>
             </div>

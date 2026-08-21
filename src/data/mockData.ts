@@ -595,6 +595,74 @@ export const SPEECH_STIMULI_BANK: SpeechStimulus[] = [
   { id: 'stim-th-en-4', targetSound: '/th/', level: 'Sentence', prompt: 'The thick thread went through the thin thimble.', phoneticTarget: '/ðə θɪk θrɛd wɛnt θruː ðə θɪn ˈθɪm.bəl/', phoneticPosition: 'initial', language: 'English', cueTips: 'Monitor voiceless /θ/ in: thick, thread, through, thin, thimble.' },
   { id: 'stim-th-en-5', targetSound: '/th/', level: 'Sentence', prompt: 'Thunder and lightning happen thirty thousand times each month.', phoneticTarget: 'Dental fricative load', phoneticPosition: 'initial', language: 'English', cueTips: 'Two dental targets: Thunder and thirty/thousand — maintain interdental placement.' },
   { id: 'stim-th-en-6', targetSound: '/th/', level: 'Conversation', prompt: 'What do you think is the most interesting thing about science?', phoneticTarget: 'Elicited /th/ in connected speech', phoneticPosition: 'initial', language: 'English', cueTips: 'Listen for think, thing, that, the, three, through in spontaneous speech.' },
+
+  // ────────────── /sh/ — English ──────────────
+  { id: 'stim-sh-en-1', targetSound: '/sh/', level: 'Word', prompt: 'Shoe', phoneticTarget: '/ʃuː/', phoneticPosition: 'initial', language: 'English', cueTips: 'Round lips slightly, tongue blade elevates toward palato-alveolar region.' },
+  { id: 'stim-sh-en-2', targetSound: '/sh/', level: 'Word', prompt: 'Ship', phoneticTarget: '/ʃɪp/', phoneticPosition: 'initial', language: 'English', cueTips: 'Voiceless postalveolar fricative onset before short vowel.' },
+  { id: 'stim-sh-en-3', targetSound: '/sh/', level: 'Word', prompt: 'Shell', phoneticTarget: '/ʃɛl/', phoneticPosition: 'initial', language: 'English', cueTips: 'Maintain central airstream with palatal friction.' },
+  { id: 'stim-sh-en-4', targetSound: '/sh/', level: 'Sentence', prompt: 'She sells shiny shoes by the seashore.', phoneticTarget: '/ʃiː sɛlz ˈʃaɪ.ni ʃuːz baɪ ðə ˈsiː.ʃɔːr/', phoneticPosition: 'initial', language: 'English', cueTips: 'Differentiate /ʃ/ (she, shiny, shoes, seashore) from /s/ (sells).' },
+  { id: 'stim-sh-en-5', targetSound: '/sh/', level: 'Conversation', prompt: 'Tell me about a time you went shopping for shoes or clothes.', phoneticTarget: 'Elicited /sh/ in narrative speech', phoneticPosition: 'initial', language: 'English', cueTips: 'Monitor /ʃ/ vs /s/ substitution in spontaneous speech.' },
+
+  // ────────────── /sh/ — Telugu ──────────────
+  { id: 'stim-sh-en-6', targetSound: '/sh/', level: 'Word', prompt: 'Shanti (శాంతి)', phoneticTarget: '/ʃaːn.t̪i/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Palatal sibilant friction with retroflex nasal transition.' },
+  { id: 'stim-sh-te-1', targetSound: '/sh/', level: 'Word', prompt: 'Shanti (శాంతి)', phoneticTarget: '/ʃaːn.t̪i/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Palatal sibilant friction with retroflex nasal transition.' },
+  { id: 'stim-sh-te-2', targetSound: '/sh/', level: 'Sentence', prompt: 'శివుడు కొండపై శోభతో ఉన్నాడు (Shiva is gracefully on the mountain).', phoneticTarget: '/ʃi.vu.ɖu kon.ɖa.pai ʃoː.bʱa.t̪oː un.naː.ɖu/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Monitor initial /ʃ/ in శివుడు and శోభతో.' },
+
+  // ────────────── /sh/ — Hindi ──────────────
+  { id: 'stim-sh-hi-1', targetSound: '/sh/', level: 'Word', prompt: 'Sher (शेर)', phoneticTarget: '/ʃeːr/', phoneticPosition: 'initial', language: 'Hindi', cueTips: 'Voiceless palatal fricative onset before mid front vowel.' },
+  { id: 'stim-sh-hi-2', targetSound: '/sh/', level: 'Sentence', prompt: 'श्याम शाम को शहर गया (Shyam went to the city in the evening).', phoneticTarget: '/ʃjaːm ʃaːm koː ʃa.har ga.jaː/', phoneticPosition: 'initial', language: 'Hindi', cueTips: 'Maintain consistent /ʃ/ friction in श्याम, शाम, and शहर.' },
+
+  // ────────────── /sh/ — Kannada ──────────────
+  { id: 'stim-sh-kn-1', targetSound: '/sh/', level: 'Word', prompt: 'Shanti (ಶಾಂತಿ)', phoneticTarget: '/ʃaːn.t̪i/', phoneticPosition: 'initial', language: 'Kannada', cueTips: 'Palatal fricative articulation.' },
+  { id: 'stim-sh-kn-2', targetSound: '/sh/', level: 'Sentence', prompt: 'ಶಿವನು ಶ್ರೇಷ್ಠವಾಗಿ ಕಾಣಿಸುತ್ತಾನೆ (Shiva looks grand).', phoneticTarget: '/ʃi.va.nu ʃreːʂ.ʈʰa.vaː.gi kaː.ɳi.sut.taː.ne/', phoneticPosition: 'initial', language: 'Kannada', cueTips: 'Target initial palatal sibilant in ಶಿವನು and ಶ್ರೇಷ್ಠವಾಗಿ.' },
+
+  // ────────────── /sh/ — Tamil ──────────────
+  { id: 'stim-sh-ta-1', targetSound: '/sh/', level: 'Word', prompt: 'Shanti (சாந்தி)', phoneticTarget: '/ʃaːn.t̪i/', phoneticPosition: 'initial', language: 'Tamil', cueTips: 'Palatal sibilant articulation.' },
+  { id: 'stim-sh-ta-2', targetSound: '/sh/', level: 'Sentence', prompt: 'சிவராமன் அமைதியாக இருந்தான் (Sivaraman was peaceful).', phoneticTarget: '/ʃi.va.raː.ma.nan a.mai.t̪i.yaː.ga irun.t̪aːn/', phoneticPosition: 'initial', language: 'Tamil', cueTips: 'Sustain palatal frication in initial position.' },
+
+  // ────────────── /sh/ — Malayalam ──────────────
+  { id: 'stim-sh-ml-1', targetSound: '/sh/', level: 'Word', prompt: 'Shivan (ശിവൻ)', phoneticTarget: '/ʃi.ʋan/', phoneticPosition: 'initial', language: 'Malayalam', cueTips: 'Voiceless palatal fricative.' },
+  { id: 'stim-sh-ml-2', targetSound: '/sh/', level: 'Sentence', prompt: 'ശ്യാം ശാന്തമായി സംസാരിച്ചു (Shyam spoke peacefully).', phoneticTarget: '/ʃjaːm ʃaːn.t̪a.maː.yi sam.saː.ri.t͡ʃːu/', phoneticPosition: 'initial', language: 'Malayalam', cueTips: 'Monitor initial palatal sibilant in ശ്യാം and ശാന്തമായി.' },
+
+  // ────────────── /th/ — Telugu ──────────────
+  { id: 'stim-th-te-1', targetSound: '/th/', level: 'Word', prompt: 'Thalli (తల్లి)', phoneticTarget: '/t̪al.li/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Dental stop precision.' },
+  { id: 'stim-th-te-2', targetSound: '/th/', level: 'Sentence', prompt: 'తల్లి తన బిడ్డను ప్రేమగా చూసుకుంది (Mother looked at her child lovingly).', phoneticTarget: '/t̪al.li t̪a.na biɖ.ɖa.nu preː.ma.gaː t͡ʃuː.su.kun.di/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Target dental stop onset.' },
+
+  // ────────────── /th/ — Hindi ──────────────
+  { id: 'stim-th-hi-1', targetSound: '/th/', level: 'Word', prompt: 'Thali (थाली)', phoneticTarget: '/t̪ʰaː.liː/', phoneticPosition: 'initial', language: 'Hindi', cueTips: 'Aspirated dental stop.' },
+  { id: 'stim-th-hi-2', targetSound: '/th/', level: 'Sentence', prompt: 'रमेश थाली में खाना लाया (Ramesh brought food in the plate).', phoneticTarget: '/ra.meːʃ t̪ʰaː.liː mẽː kʰaː.naː laː.jaː/', phoneticPosition: 'initial', language: 'Hindi', cueTips: 'Monitor aspirated dental stop in थाली.' },
+
+  // ────────────── /th/ — Kannada ──────────────
+  { id: 'stim-th-kn-1', targetSound: '/th/', level: 'Word', prompt: 'Tayi (ತಾಯಿ)', phoneticTarget: '/t̪aː.ji/', phoneticPosition: 'initial', language: 'Kannada', cueTips: 'Dental consonant onset.' },
+  { id: 'stim-th-kn-2', targetSound: '/th/', level: 'Sentence', prompt: 'ತಾಯಿ ಮಗುವಿಗೆ ಊಟ ನೀಡಿದಳು (Mother fed the child).', phoneticTarget: '/t̪aː.ji ma.gu.vi.ge uː.ʈa niː.ɖi.da.ɭu/', phoneticPosition: 'initial', language: 'Kannada', cueTips: 'Target initial dental consonant in ತಾಯಿ.' },
+
+  // ────────────── /th/ — Tamil ──────────────
+  { id: 'stim-th-ta-1', targetSound: '/th/', level: 'Word', prompt: 'Thaai (தாய்)', phoneticTarget: '/t̪aːi/', phoneticPosition: 'initial', language: 'Tamil', cueTips: 'Dental consonant articulation.' },
+  { id: 'stim-th-ta-2', targetSound: '/th/', level: 'Sentence', prompt: 'தாய் குழந்தையை அன்பாக பார்த்தார் (Mother looked after the child).', phoneticTarget: '/t̪aːi ku.ɭan.t̪ai.yai an.baː.ga paːr.t̪aːr/', phoneticPosition: 'initial', language: 'Tamil', cueTips: 'Maintain dental contact in தாய்.' },
+
+  // ────────────── /th/ — Malayalam ──────────────
+  { id: 'stim-th-ml-1', targetSound: '/th/', level: 'Word', prompt: 'Thala (തല)', phoneticTarget: '/t̪a.la/', phoneticPosition: 'initial', language: 'Malayalam', cueTips: 'Dental stop onset.' },
+  { id: 'stim-th-ml-2', targetSound: '/th/', level: 'Sentence', prompt: 'അമ്മ കുഞ്ഞിനെ സ്നേഹത്തോടെ നോക്കി (Mother looked at the child lovingly).', phoneticTarget: '/am.ma kuɲ.ɲi.ne sneː.ha.t̪oː.ɖe noːk.ki/', phoneticPosition: 'initial', language: 'Malayalam', cueTips: 'Target dental consonant articulation.' },
+
+  // ────────────── /k/ — Telugu ──────────────
+  { id: 'stim-k-te-1', targetSound: '/k/', level: 'Word', prompt: 'Kaki (కాకి)', phoneticTarget: '/kaː.ki/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Clear velar stop.' },
+  { id: 'stim-k-te-2', targetSound: '/k/', level: 'Sentence', prompt: 'కాకి చెట్టు కొమ్మపై కూర్చుంది (The crow sat on the tree branch).', phoneticTarget: '/kaː.ki t͡ʃet.ʈu kom.ma.pai kuːr.t͡ʃun.di/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Target /k/ in కాకి and కొమ్మపై.' },
+
+  // ────────────── /k/ — Malayalam ──────────────
+  { id: 'stim-k-ml-1', targetSound: '/k/', level: 'Word', prompt: 'Kakka (കാക്ക)', phoneticTarget: '/kaːk.ka/', phoneticPosition: 'initial', language: 'Malayalam', cueTips: 'Velar stop precision.' },
+  { id: 'stim-k-ml-2', targetSound: '/k/', level: 'Sentence', prompt: 'കാക്ക മരക്കൊമ്പിലിരിക്കുന്നു (The crow is sitting on the tree branch).', phoneticTarget: '/kaːk.ka ma.rak.kom.bi.li.rik.kun.nu/', phoneticPosition: 'initial', language: 'Malayalam', cueTips: 'Target /k/ in കാക്ക.' },
+
+  // ────────────── /g/ — Kannada ──────────────
+  { id: 'stim-g-kn-1', targetSound: '/g/', level: 'Word', prompt: 'Gali (ಗಾಳಿ)', phoneticTarget: '/gaː.ɭi/', phoneticPosition: 'initial', language: 'Kannada', cueTips: 'Voiced velar stop.' },
+  { id: 'stim-g-kn-2', targetSound: '/g/', level: 'Sentence', prompt: 'ಗಾಳಿ ಜೋರಾಗಿ ಬೀಸುತ್ತಿದೆ (The wind is blowing hard).', phoneticTarget: '/gaː.ɭi joː.raː.gi biː.sut.ti.de/', phoneticPosition: 'initial', language: 'Kannada', cueTips: 'Target voiced velar in ಗಾಳಿ.' },
+
+  // ────────────── /g/ — Tamil ──────────────
+  { id: 'stim-g-ta-1', targetSound: '/g/', level: 'Word', prompt: 'Gopuram (கோபுரம்)', phoneticTarget: '/goː.pu.ram/', phoneticPosition: 'initial', language: 'Tamil', cueTips: 'Voiced velar stop.' },
+  { id: 'stim-g-ta-2', targetSound: '/g/', level: 'Sentence', prompt: 'கோபுரத்தின் உச்சி உயரமாக உள்ளது (The top of the tower is high).', phoneticTarget: '/goː.pu.rat.t̪in ut.t͡ʃi u.ya.ra.maː.ga ul.la.t̪u/', phoneticPosition: 'initial', language: 'Tamil', cueTips: 'Target /g/ in கோபுரம்.' },
+
+  // ────────────── /g/ — Malayalam ──────────────
+  { id: 'stim-g-ml-1', targetSound: '/g/', level: 'Word', prompt: 'Ganam (ഗാനം)', phoneticTarget: '/gaː.nam/', phoneticPosition: 'initial', language: 'Malayalam', cueTips: 'Voiced velar stop precision.' },
+  { id: 'stim-g-ml-2', targetSound: '/g/', level: 'Sentence', prompt: 'കുട്ടി മനോഹരമായ ഗാനം പാടി (The child sang a beautiful song).', phoneticTarget: '/kut.ti ma.noː.ha.ra.maː.ya gaː.nam paː.ɖi/', phoneticPosition: 'initial', language: 'Malayalam', cueTips: 'Target /g/ in ഗാനം.' },
 ];
 
 
