@@ -1068,6 +1068,22 @@ export const SpeechPracticeStudio: React.FC = () => {
                   ? 'Velar closure contact verified. Monitor coarticulation on adjacent vowels.'
                   : selectedPatient.targetSound === '/g/'
                   ? 'Voiced velar stop burst confirmed. Monitor voice onset time consistency.'
+                  : selectedPatient.targetSound === '/f/'
+                  ? 'Voiceless labiodental fricative airstream verified. Monitor upper teeth placement on lower lip.'
+                  : selectedPatient.targetSound === '/v/'
+                  ? 'Voiced labiodental friction confirmed. Monitor glottal voicing onset.'
+                  : selectedPatient.targetSound === '/p/'
+                  ? 'Voiceless bilabial plosive burst detected. Monitor lip closure and aspiration.'
+                  : selectedPatient.targetSound === '/b/'
+                  ? 'Voiced bilabial plosive burst confirmed. Monitor voice onset time.'
+                  : selectedPatient.targetSound === '/t/'
+                  ? 'Alveolar stop contact verified. Monitor tongue tip precision on alveolar ridge.'
+                  : selectedPatient.targetSound === '/d/'
+                  ? 'Voiced alveolar stop contact verified. Monitor voice onset and release burst.'
+                  : selectedPatient.targetSound === '/n/'
+                  ? 'Alveolar nasal formant anti-resonance confirmed. Monitor velopharyngeal seal.'
+                  : selectedPatient.targetSound === '/m/'
+                  ? 'Bilabial nasal murmur formant resonance verified. Monitor lip closure during nasalization.'
                   : 'Monitor target phoneme production across all word positions.'}
               </p>
             </div>
