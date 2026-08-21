@@ -78,7 +78,7 @@ interface AppContextType {
   isNotificationOpen: boolean;
   setIsNotificationOpen: (open: boolean) => void;
   patients: Patient[];
-  selectedPatient: Patient;
+  selectedPatient: Patient | null;
   sessionRecords: SessionRecord[];
   supervisorCases: SupervisorPriorityCase[];
   studentCompetencies: StudentCompetencyItem[];
@@ -103,6 +103,7 @@ interface AppContextType {
   markNotificationAsRead: (notificationId: string) => void;
   markAllNotificationsAsRead: () => void;
   allocateCaseToTherapist: (patientId: string, therapistId: string) => void;
+  refreshData: () => Promise<void>;
 }
 
 const defaultDashboardStats: DashboardStats = {
@@ -149,7 +150,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [aiActivities, setAiActivities] = useState<AIActivitySuggestion[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>(defaultDashboardStats);
 
-  const selectedPatient = patients.find((p) => p.id === selectedPatientId) || patients[0] || INITIAL_PATIENTS[0];
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId) || patients[0] || null;
   const unreadNotificationCount = notifications.filter((n) => n.unread).length;
 
   // ─── Fetch Sessions ────────────────────────────────────────────────────────
@@ -315,9 +316,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchDbData = async () => {
     setIsLoading(true);
     try {
-      // Patients
-      const res = await apiClient.get('/patients');
-      if (res.success && res.data && res.data.length > 0) {
+      // ── Fetch patients, cases, and AI activities in PARALLEL for speed ──
+      const [res, casesRes, aiRes] = await Promise.all([
+        apiClient.get('/patients'),
+        apiClient.get('/cases'),
+        apiClient.get('/ai/activities'),
+      ]);
+
+      // ── Patients ──
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
         const mapped = res.data.map((dbP: any) => ({
           ...dbP,
           id: dbP._id,
@@ -340,20 +347,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
         setPatients(mapped);
 
-        // Ensure first patient is selected
         const firstPatient = mapped[0];
         if (firstPatient) {
           setSelectedPatientId((prev) => prev || firstPatient.id);
           fetchSessionsForPatient(firstPatient.id);
         }
       } else {
-        setPatients(INITIAL_PATIENTS);
-        setSelectedPatientId(INITIAL_PATIENTS[0].id);
-        fetchSessionsForPatient(INITIAL_PATIENTS[0].id);
+        // FIX #1: No mock/demo fallback — new account starts with 0 cases
+        setPatients([]);
       }
 
-      // Cases → supervisor priority queue
-      const casesRes = await apiClient.get('/cases');
+      // ── Cases → supervisor priority queue ──
       if (casesRes.success && casesRes.data) {
         const mappedCases = casesRes.data.map((c: any) => ({
           id: c._id,
@@ -377,8 +381,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSupervisorCases(mappedCases);
       }
 
-      // AI Activities
-      const aiRes = await apiClient.get('/ai/activities');
+      // ── AI Activities ──
       if (aiRes.success && Array.isArray(aiRes.data) && aiRes.data.length > 0) {
         const mappedActivities: AIActivitySuggestion[] = aiRes.data.map((dbAct: any) => ({
           id: dbAct.activityId || dbAct._id,
@@ -393,8 +396,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAiActivities(mappedActivities);
       }
 
-      // Run remaining fetches in parallel (non-critical)
-      await Promise.allSettled([
+      // Run remaining non-critical fetches in parallel
+      Promise.allSettled([
         fetchNotifications(),
         fetchStudentCompetencies(),
         fetchAnalytics(),
@@ -739,6 +742,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markNotificationAsRead,
         markAllNotificationsAsRead,
         allocateCaseToTherapist,
+        refreshData: fetchDbData,
       }}
     >
       {children}

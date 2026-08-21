@@ -21,7 +21,7 @@ const ROLE_META: Record<string, { label: string; color: string; icon: React.Elem
 };
 
 export const AdminUsersView: React.FC = () => {
-  const { currentUser, patients, deletePatient } = useApp();
+  const { currentUser, patients, deletePatient, refreshData } = useApp();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -65,6 +65,7 @@ export const AdminUsersView: React.FC = () => {
       const res = await apiClient.delete(`/users/${user._id}`);
       if (res.success) {
         setUsers(prev => prev.filter(u => u._id !== user._id));
+        await refreshData();
         showToast('success', res.message || `${user.name} deleted successfully`);
       } else {
         showToast('error', res.error || 'Delete failed');

@@ -33,6 +33,8 @@ export const TherapistDashboard: React.FC = () => {
     dashboardStats,
     isLoading,
     selectedPatient,
+    currentUser,
+    role,
   } = useApp();
 
   const [selectedFilter, setSelectedFilter] = useState<'All' | 'High' | 'Active'>('All');
@@ -46,9 +48,11 @@ export const TherapistDashboard: React.FC = () => {
   const featuredActivity = aiActivities[0];
 
   // Derive stat values from real data
-  const activeCasesCount = dashboardStats.activeCases > 0
-    ? dashboardStats.activeCases
-    : patients.filter((p) => p.status === 'Active').length;
+  const activeCasesCount = currentUser?.role === 'student_therapist'
+    ? patients.length
+    : (dashboardStats.activeCases > 0
+        ? dashboardStats.activeCases
+        : patients.filter((p) => p.status === 'Active').length);
 
   const awaitingReview = dashboardStats.plansAwaitingReview > 0
     ? dashboardStats.plansAwaitingReview
@@ -161,6 +165,19 @@ export const TherapistDashboard: React.FC = () => {
                   <div className="h-2 bg-slate-200 rounded-full" />
                 </div>
               ))}
+            </div>
+          ) : filteredPatients.length === 0 ? (
+            <div className="bg-slate-50/80 border border-dashed border-slate-200 rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-3">
+              <Users className="w-10 h-10 text-slate-300" />
+              <h4 className="font-bold text-slate-700 text-sm">No Active Student Cases</h4>
+              <p className="text-xs text-slate-500 max-w-xs">You have not registered or been assigned any student cases yet.</p>
+              <button
+                onClick={() => setCurrentView('patients')}
+                className="px-4 py-2 bg-[#006A61] hover:bg-[#005049] text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer mt-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Register Patient</span>
+              </button>
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 gap-4">
