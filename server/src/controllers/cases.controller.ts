@@ -16,27 +16,13 @@ export const getCases = async (req: AuthRequest, res: Response) => {
     let caseQuery: any = {};
 
     if (role === 'student_therapist') {
-      // 1. Cases created by this student therapist or assigned to this student therapist
-      const assignedPatients = await Patient.find({ assignedTherapistId: userId }).select('_id caseId');
-      const assignedCaseIds = assignedPatients.map(p => p.caseId);
-
-      // 2. Cases created by OTHER student therapists (exclude from this therapist's view)
-      const otherCases = await Case.find({ therapistId: { $ne: userId } }).select('_id');
-      const otherCaseIds = otherCases.map(c => c._id);
-
-      caseQuery = {
-        $or: [
-          { therapistId: userId },
-          { caseId: { $in: assignedCaseIds } },
-          { _id: { $nin: otherCaseIds } } // keep sample/demo cases visible
-        ]
-      };
+      // FIX: Strictly show ONLY cases where this therapist is the creator/owner.
+      // Do NOT include a $nin fallback — that was leaking other users' cases.
+      caseQuery = { therapistId: userId };
     } else if (role === 'supervisor') {
+      // FIX: Supervisor sees ONLY cases explicitly submitted to them.
+      // No empty fallback to all cases — a new supervisor starts with 0.
       caseQuery = { supervisorId: userId };
-      const count = await Case.countDocuments(caseQuery);
-      if (count === 0) {
-        caseQuery = {};
-      }
     } else if (role === 'admin') {
       caseQuery = {};
     }
@@ -128,14 +114,20 @@ export const selectSupervisor = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Supervisor not found' });
     }
 
-    // Find the case — by MongoDB _id or by caseId string
+    // Find the case — try by MongoDB _id first, then by caseId string, then by patientId
+    // This handles all cases: seeded data (caseId string), new cases (MongoDB _id), and
+    // cases created via createPatient where the patient's _id is passed.
     let caseItem = await Case.findById(req.params.id).catch(() => null);
     if (!caseItem) caseItem = await Case.findOne({ caseId: req.params.id });
+    if (!caseItem) caseItem = await Case.findOne({ patientId: req.params.id });
     if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
 
     // Only the case creator (therapistId) or admin can select a supervisor
     if (req.user.role !== 'admin' && String(caseItem.therapistId) !== String(userId)) {
-      return res.status(403).json({ success: false, error: 'You do not own this case' });
+      return res.status(403).json({
+        success: false,
+        error: 'You do not own this case. Only the therapist who created this case can assign a supervisor.',
+      });
     }
 
     caseItem.supervisorId = supervisor._id as any;

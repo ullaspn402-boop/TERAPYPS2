@@ -47,7 +47,7 @@ export const SupervisorCenter: React.FC = () => {
 
   const handleSignOff = (caseId: string, headline: string) => {
     setSignedCaseIds((prev) => [...prev, caseId]);
-    approveSupervisorCase(caseId, `Dr. Sarah Mehta approved plan adjustments for ${headline}.`);
+    approveSupervisorCase(caseId, `${currentUser?.name || 'Supervisor'} approved plan adjustments for ${headline}.`);
   };
 
   return (
@@ -55,10 +55,10 @@ export const SupervisorCenter: React.FC = () => {
       {/* Top Banner with Illustrated Avatar */}
       <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Avatar name={currentUser?.name || "Dr. Sarah Mehta"} role="supervisor" size="xl" />
+          <Avatar name={currentUser?.name || "Clinical Supervisor"} role="supervisor" size="xl" />
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">{currentUser?.name || "Dr. Sarah Mehta"}</h2>
+              <h2 className="text-lg font-bold text-slate-900">{currentUser?.name || "Clinical Supervisor"}</h2>
               <span className="text-xs bg-[#E0F2F1] text-[#006A61] font-semibold px-2.5 py-0.5 rounded-full border border-[#006A61]/20">
                 Senior Clinical Supervisor
               </span>

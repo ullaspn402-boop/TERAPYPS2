@@ -10,7 +10,7 @@ import {
   AIActivitySuggestion,
   TherapyLevel,
 } from '../types';
-import { INITIAL_PATIENTS } from '../data/mockData';
+// Note: INITIAL_PATIENTS removed — all data is fetched from the authenticated user's backend.
 
 export type NavigationPage =
   | 'landing'
@@ -417,6 +417,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     localStorage.setItem('speechcare_token', token);
+
+    // FIX: Clear ALL previous user's data before loading the new user's data.
+    // This prevents stale state from one session bleeding into the next user's session.
+    setPatients([]);
+    setSessionRecords([]);
+    setSupervisorCases([]);
+    setStudentCompetencies([]);
+    setNotifications([]);
+    setAiActivities([]);
+    setDashboardStats(defaultDashboardStats);
+    setSelectedPatientId('');
+
     setRoleState(user.role as UserRole);
     setCurrentUser({ name: user.name, role: user.role, avatarType: user.avatarType });
     setIsAuthenticated(true);
@@ -574,11 +586,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'Pending Allocation',
       priority: 'Normal',
       assignedTherapist: assignedTherapistObj,
-      supervisor: {
-        id: 's1',
-        name: 'Dr. Sarah Mehta',
-        title: 'Clinical Supervisor & Associate Professor',
-      },
+      // FIX: Do not hardcode supervisor — leave undefined until the server responds
+      // with the real supervisor assignment (after selectSupervisor is called).
+      supervisor: undefined,
       sessionCount: 0,
       totalTargetSessions: 12,
       recentSessionDate: 'Just now',

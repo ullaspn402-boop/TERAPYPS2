@@ -17,6 +17,9 @@ interface SupervisorUser {
 
 interface SupervisorSelectionModalProps {
   patient: Patient;
+  /** The resolved MongoDB _id of the Case document. Passed in by AICaseAllocationView
+   *  so the modal submits to the correct case regardless of seeded vs. new data. */
+  caseMongoId?: string;
   isOpen: boolean;
   onClose: () => void;
   onSelectSuccess: (supervisorName: string) => void;
@@ -24,6 +27,7 @@ interface SupervisorSelectionModalProps {
 
 export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> = ({
   patient,
+  caseMongoId,
   isOpen,
   onClose,
   onSelectSuccess,
@@ -40,18 +44,23 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
     setIsLoading(true);
     setError(null);
 
+    // FIX: Always load REAL supervisor accounts from the backend.
+    // Never show "You do not own a case" — that error belongs to case lookup,
+    // not to the supervisor list. If no supervisors exist, show a clear message.
     apiClient
       .get('/users/supervisors')
       .then((res) => {
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           setSupervisors(res.data);
           setSelectedSupervisorId(res.data[0]._id);
+          setError(null);
         } else {
-          setError('No active supervisor accounts found.');
+          setSupervisors([]);
+          setError('No Supervisor accounts are currently available. Ask your institution to register a Supervisor.');
         }
       })
       .catch((err) => {
-        setError(err.message || 'Failed to load supervisor list.');
+        setError(err.message || 'Failed to load supervisor list. Please try again.');
       })
       .finally(() => {
         setIsLoading(false);
@@ -68,7 +77,12 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
 
     try {
       const chosenSup = supervisors.find((s) => s._id === selectedSupervisorId);
-      const targetCaseId = patient.caseId || patient.id;
+
+      // FIX: Use the resolved MongoDB Case _id (caseMongoId) when available.
+      // This is the actual Case document _id — not the patient id.
+      // Fall back chain: caseMongoId → patient.caseId → patient.id
+      // The backend selectSupervisor now also accepts patientId as a fallback.
+      const targetCaseId = caseMongoId || patient.caseId || patient.id;
 
       const res = await apiClient.patch(`/cases/${targetCaseId}/supervisor`, {
         supervisorId: selectedSupervisorId,
@@ -78,10 +92,10 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
         onSelectSuccess(chosenSup?.name || 'Selected Supervisor');
         onClose();
       } else {
-        setError(res.error || 'Failed to assign supervisor.');
+        setError(res.error || 'Failed to assign supervisor. Please try again.');
       }
     } catch (err: any) {
-      setError(err.message || 'Error sending case to supervisor.');
+      setError(err.message || 'Error sending case to supervisor. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -142,7 +156,7 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
               </div>
             ) : supervisors.length === 0 ? (
               <div className="p-6 text-center text-slate-500 text-xs bg-slate-50 rounded-xl border border-slate-200">
-                No supervisors currently available in the database.
+                No Supervisor accounts are currently available.
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -213,7 +227,7 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
             </button>
             <button
               onClick={handleConfirmSupervisor}
-              disabled={isSubmitting || !selectedSupervisorId || isLoading}
+              disabled={isSubmitting || !selectedSupervisorId || isLoading || supervisors.length === 0}
               className="px-5 py-2 bg-[#006A61] hover:bg-[#005049] text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
             >
               {isSubmitting ? 'Submitting...' : 'Submit to Supervisor'}

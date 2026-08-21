@@ -117,10 +117,24 @@ export const LoginView: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = (roleEmail: string, role: string) => {
+  const handleDemoLogin = async (roleEmail: string, role: string) => {
     setEmail(roleEmail);
     setPassword('password123');
     setSelectedRole(role);
+    setSigninError('');
+    setSigninLoading(true);
+    try {
+      const res = await apiClient.post('/auth/login', { email: roleEmail, password: 'password123' });
+      if (res.success && res.data) {
+        login(res.data.token, res.data);
+      } else {
+        setSigninError('Demo login failed.');
+      }
+    } catch (err: any) {
+      setSigninError(err.message || 'Demo login error.');
+    } finally {
+      setSigninLoading(false);
+    }
   };
 
   const currentPortal = ROLE_PORTALS[selectedRole] || ROLE_PORTALS['student_therapist'];

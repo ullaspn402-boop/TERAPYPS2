@@ -11,30 +11,23 @@ export const getPatients = async (req: AuthRequest, res: Response) => {
     let patientQuery: any = {};
 
     if (role === 'student_therapist') {
-      // 1. Patients created by this student therapist
+      // FIX: Strictly filter to only THIS therapist's own patients.
+      // Do NOT include a $nin fallback — that was leaking other users' patients.
       const myCases = await Case.find({ therapistId: userId }).select('patientId');
       const myPatientIds = myCases.map(c => c.patientId);
 
-      // 2. Patients created by OTHER student therapists (exclude from this therapist's view)
-      const otherCases = await Case.find({ therapistId: { $ne: userId } }).select('patientId');
-      const otherPatientIds = otherCases.map(c => c.patientId);
-
       patientQuery = {
         $or: [
-          { _id: { $in: myPatientIds } },
           { assignedTherapistId: userId },
-          { _id: { $nin: otherPatientIds } } // keep sample/demo patients visible alongside therapist's own patients
-        ]
+          { _id: { $in: myPatientIds } },
+        ],
       };
     } else if (role === 'supervisor') {
-      // Supervisor sees patients linked to cases assigned to them
+      // FIX: Supervisor sees ONLY patients whose cases are submitted to them.
+      // No empty fallback to all patients — a new supervisor starts with 0.
       const supervisorCases = await Case.find({ supervisorId: userId }).select('patientId');
       const supervisorPatientIds = supervisorCases.map(c => c.patientId);
       patientQuery = { _id: { $in: supervisorPatientIds } };
-      const count = await Patient.countDocuments(patientQuery);
-      if (count === 0) {
-        patientQuery = {};
-      }
     } else if (role === 'admin') {
       // Admin sees all
       patientQuery = {};

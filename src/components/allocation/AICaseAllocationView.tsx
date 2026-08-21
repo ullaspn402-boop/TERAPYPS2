@@ -13,20 +13,54 @@ import { THERAPIST_CANDIDATES } from '../../data/mockData';
 import { SupervisorSelectionModal } from '../therapist/SupervisorSelectionModal';
 
 export const AICaseAllocationView: React.FC = () => {
-  const { selectedPatient, navigateToPatient, supervisorCases } = useApp();
+  const { selectedPatient, navigateToPatient } = useApp();
 
   const [candidates, setCandidates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSupervisorModal, setShowSupervisorModal] = useState(false);
 
-  // Find the exact Case MongoDB ID instead of the Patient MongoDB ID
-  const caseItem = supervisorCases.find(c => c.caseId === selectedPatient.caseId);
-  const targetId = caseItem ? caseItem.id : selectedPatient.id;
+  // FIX: Resolve the actual MongoDB Case _id for this patient from the backend
+  // instead of relying on the pre-loaded supervisorCases array (which can be empty
+  // for a brand-new student therapist account or after a fresh login).
+  const [resolvedCaseId, setResolvedCaseId] = useState<string>('');
+
+  useEffect(() => {
+    if (!selectedPatient) return;
+
+    // Step 1: Resolve the correct case ID from the backend
+    const resolveCaseId = async () => {
+      try {
+        // Try to find the case by the patient's _id (MongoDB ObjectId)
+        const casesRes = await apiClient.get('/cases');
+        if (casesRes.success && Array.isArray(casesRes.data)) {
+          // Find a case whose patientId matches this patient
+          const matchingCase = casesRes.data.find(
+            (c: any) =>
+              (c.patientId?._id || c.patientId) === selectedPatient.id ||
+              c.caseId === selectedPatient.caseId
+          );
+          if (matchingCase) {
+            setResolvedCaseId(matchingCase._id || matchingCase.id);
+            return;
+          }
+        }
+      } catch {
+        // fallback below
+      }
+
+      // Step 2: If no case found in list, use the patient's id — the
+      // selectSupervisor backend now handles lookup by patientId as well.
+      setResolvedCaseId(selectedPatient.id);
+    };
+
+    resolveCaseId();
+  }, [selectedPatient?.id]);
 
   const [selectedCandidateId, setSelectedCandidateId] = useState<string>('');
 
   useEffect(() => {
+    if (!resolvedCaseId) return;
     setIsLoading(true);
 
     const fallbackCandidates = THERAPIST_CANDIDATES.map(c => ({
@@ -40,7 +74,7 @@ export const AICaseAllocationView: React.FC = () => {
       avatarType: c.name.includes('Rohan') || c.name.includes('Mohit') ? 'male' : 'female'
     }));
 
-    apiClient.get('/cases/' + targetId + '/allocation-recommendations')
+    apiClient.get('/cases/' + resolvedCaseId + '/allocation-recommendations')
       .then(res => {
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           setCandidates(res.data);
@@ -59,7 +93,8 @@ export const AICaseAllocationView: React.FC = () => {
         setError(null);
         setIsLoading(false);
       });
-  }, [targetId]);
+  }, [resolvedCaseId]);
+
   const [isAllocated, setIsAllocated] = useState<boolean>(false);
 
   return (
@@ -255,6 +290,7 @@ export const AICaseAllocationView: React.FC = () => {
       {showSupervisorModal && (
         <SupervisorSelectionModal
           patient={selectedPatient}
+          caseMongoId={resolvedCaseId}
           isOpen={showSupervisorModal}
           onClose={() => setShowSupervisorModal(false)}
           onSelectSuccess={() => {
