@@ -3,6 +3,7 @@ import { X, ShieldCheck, Sparkles, Check, AlertCircle } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { Avatar } from '../common/Avatar';
 import { Patient } from '../../types';
+import { useApp } from '../../context/AppContext';
 
 interface SupervisorUser {
   _id: string;
@@ -32,6 +33,7 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
   onClose,
   onSelectSuccess,
 }) => {
+  const { refreshData } = useApp();
   const [supervisors, setSupervisors] = useState<SupervisorUser[]>([]);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -78,21 +80,32 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
     try {
       const chosenSup = supervisors.find((s) => s._id === selectedSupervisorId);
 
-      // FIX: Use the resolved MongoDB Case _id (caseMongoId) when available.
-      // This is the actual Case document _id — not the patient id.
-      // Fall back chain: caseMongoId → patient.caseId → patient.id
-      // The backend selectSupervisor now also accepts patientId as a fallback.
-      const targetCaseId = caseMongoId || patient.caseId || patient.id;
+      // Try multiple ID candidate representations: caseMongoId, patient.id, patient.caseId
+      const candidateIds = [caseMongoId, patient.id, patient.caseId].filter(Boolean) as string[];
+      let lastError = '';
+      let successRes: any = null;
 
-      const res = await apiClient.patch(`/cases/${targetCaseId}/supervisor`, {
-        supervisorId: selectedSupervisorId,
-      });
+      for (const targetId of candidateIds) {
+        try {
+          const res = await apiClient.patch(`/cases/${targetId}/supervisor`, {
+            supervisorId: selectedSupervisorId,
+          });
+          if (res.success) {
+            successRes = res;
+            break;
+          }
+          lastError = res.error || 'Failed';
+        } catch (e: any) {
+          lastError = e.message || 'Failed';
+        }
+      }
 
-      if (res.success) {
+      if (successRes && successRes.success) {
+        await refreshData();
         onSelectSuccess(chosenSup?.name || 'Selected Supervisor');
         onClose();
       } else {
-        setError(res.error || 'Failed to assign supervisor. Please try again.');
+        setError(lastError || 'Failed to assign supervisor. Please try again.');
       }
     } catch (err: any) {
       setError(err.message || 'Error sending case to supervisor. Please try again.');

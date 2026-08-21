@@ -11,12 +11,13 @@ import { AuthRequest } from '../middleware/auth';
 /**
  * Safely locate a Case document regardless of whether paramId is:
  * 1. Case MongoDB ObjectId
- * 2. caseId string (e.g., "SLT-106", "CASE-001")
+ * 2. caseId string (e.g., "SLT-499", "SLT-106", "CASE-001")
  * 3. Patient MongoDB ObjectId
  * 4. patientId string (e.g., "PT-001-1234")
+ * If no Case document exists yet for the Patient, auto-creates it so lookups never fail.
  * Prevents Mongoose CastError exceptions on string lookups.
  */
-const findCaseSafely = async (paramId: string) => {
+const findCaseSafely = async (paramId: string, creatorId?: any) => {
   if (!paramId) return null;
 
   // 1. Try finding Case directly by MongoDB _id (if valid ObjectId)
@@ -25,11 +26,11 @@ const findCaseSafely = async (paramId: string) => {
     if (c) return c;
   }
 
-  // 2. Try finding Case by caseId string (e.g., "SLT-106")
+  // 2. Try finding Case by caseId string (e.g., "SLT-499", "SLT-106")
   let c = await Case.findOne({ caseId: paramId });
   if (c) return c;
 
-  // 3. Try finding Patient by patientId string or caseId string or ObjectId
+  // 3. Try finding Patient by MongoDB _id, patientId string, or caseId string
   let p = null;
   if (mongoose.Types.ObjectId.isValid(paramId)) {
     p = await Patient.findById(paramId);
@@ -39,8 +40,22 @@ const findCaseSafely = async (paramId: string) => {
   }
 
   if (p) {
-    c = await Case.findOne({ patientId: p._id });
+    // Search Case by patient's MongoDB _id or caseId string
+    c = await Case.findOne({ $or: [{ patientId: p._id }, { caseId: p.caseId }] });
     if (c) return c;
+
+    // Auto-create missing Case document for this patient if not created yet
+    c = await Case.create({
+      caseId: p.caseId || `SLT-${Math.floor(100 + Math.random() * 900)}`,
+      patientId: p._id,
+      therapistId: creatorId || p.assignedTherapistId,
+      status: 'NEW',
+      complexity: 'Medium',
+      priority: 'Normal',
+      priorityScore: 0,
+      priorityReasons: []
+    });
+    return c;
   }
 
   return null;
@@ -57,7 +72,18 @@ export const getCases = async (req: AuthRequest, res: Response) => {
     if (role === 'student_therapist') {
       caseQuery = { therapistId: userId };
     } else if (role === 'supervisor') {
-      caseQuery = { supervisorId: userId };
+      // Supervisor sees cases explicitly submitted to them via Case.supervisorId OR Patient.supervisorId
+      const supPatients = await Patient.find({ supervisorId: userId }).select('_id caseId');
+      const patientIds = supPatients.map(p => p._id);
+      const patientCaseIds = supPatients.map(p => p.caseId);
+
+      caseQuery = {
+        $or: [
+          { supervisorId: userId },
+          { patientId: { $in: patientIds } },
+          { caseId: { $in: patientCaseIds } }
+        ]
+      };
     } else if (role === 'admin') {
       caseQuery = {};
     }
@@ -145,8 +171,8 @@ export const selectSupervisor = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Supervisor not found' });
     }
 
-    // Safely locate case without CastError
-    const caseItem = await findCaseSafely(req.params.id);
+    // Safely locate case without CastError, auto-creating if needed
+    const caseItem = await findCaseSafely(req.params.id, userId);
     if (!caseItem) {
       return res.status(404).json({ success: false, error: 'Case not found' });
     }
