@@ -140,12 +140,19 @@ export const SpeechPracticeStudio: React.FC = () => {
   const recognitionRef = useRef<any>(null);
 
   // ── Filtered stimuli by patient targetSound + activeLanguage ─────────
+  const normalizeSound = (snd: string) => (snd || '').replace(/^\/+|\/+$/g, '').trim().toLowerCase();
   const patientTarget = selectedPatient?.targetSound || '';
-  const soundStimuli = SPEECH_STIMULI_BANK.filter(s => s.targetSound === patientTarget);
-  const availableStimuli = soundStimuli.filter(s => s.language?.toLowerCase() === activeLanguage.toLowerCase());
+  const normPatientTarget = normalizeSound(patientTarget);
+
+  const soundStimuli = SPEECH_STIMULI_BANK.filter(s => normalizeSound(s.targetSound) === normPatientTarget);
+  const availableStimuli = soundStimuli.filter(s => (s.language || '').trim().toLowerCase() === activeLanguage.trim().toLowerCase());
+
+  // Use availableStimuli for the selected language, or fall back to any stimuli for this sound if available
+  const effectiveStimuli = availableStimuli.length > 0 ? availableStimuli : soundStimuli;
+
   const currentStimulus: SpeechStimulus =
-    availableStimuli.length > 0
-      ? availableStimuli[selectedStimulusIndex % availableStimuli.length]
+    effectiveStimuli.length > 0
+      ? effectiveStimuli[selectedStimulusIndex % effectiveStimuli.length]
       : {
           id: 'placeholder',
           targetSound: patientTarget,

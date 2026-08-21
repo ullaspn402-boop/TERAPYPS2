@@ -602,9 +602,9 @@ export const SPEECH_STIMULI_BANK: SpeechStimulus[] = [
   { id: 'stim-sh-en-3', targetSound: '/sh/', level: 'Word', prompt: 'Shell', phoneticTarget: '/ʃɛl/', phoneticPosition: 'initial', language: 'English', cueTips: 'Maintain central airstream with palatal friction.' },
   { id: 'stim-sh-en-4', targetSound: '/sh/', level: 'Sentence', prompt: 'She sells shiny shoes by the seashore.', phoneticTarget: '/ʃiː sɛlz ˈʃaɪ.ni ʃuːz baɪ ðə ˈsiː.ʃɔːr/', phoneticPosition: 'initial', language: 'English', cueTips: 'Differentiate /ʃ/ (she, shiny, shoes, seashore) from /s/ (sells).' },
   { id: 'stim-sh-en-5', targetSound: '/sh/', level: 'Conversation', prompt: 'Tell me about a time you went shopping for shoes or clothes.', phoneticTarget: 'Elicited /sh/ in narrative speech', phoneticPosition: 'initial', language: 'English', cueTips: 'Monitor /ʃ/ vs /s/ substitution in spontaneous speech.' },
+  { id: 'stim-sh-en-6', targetSound: '/sh/', level: 'Word', prompt: 'Shadow', phoneticTarget: '/ˈʃæd.oʊ/', phoneticPosition: 'initial', language: 'English', cueTips: 'Clear postalveolar fricative onset before short front vowel.' },
 
   // ────────────── /sh/ — Telugu ──────────────
-  { id: 'stim-sh-en-6', targetSound: '/sh/', level: 'Word', prompt: 'Shanti (శాంతి)', phoneticTarget: '/ʃaːn.t̪i/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Palatal sibilant friction with retroflex nasal transition.' },
   { id: 'stim-sh-te-1', targetSound: '/sh/', level: 'Word', prompt: 'Shanti (శాంతి)', phoneticTarget: '/ʃaːn.t̪i/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Palatal sibilant friction with retroflex nasal transition.' },
   { id: 'stim-sh-te-2', targetSound: '/sh/', level: 'Sentence', prompt: 'శివుడు కొండపై శోభతో ఉన్నాడు (Shiva is gracefully on the mountain).', phoneticTarget: '/ʃi.vu.ɖu kon.ɖa.pai ʃoː.bʱa.t̪oː un.naː.ɖu/', phoneticPosition: 'initial', language: 'Telugu', cueTips: 'Monitor initial /ʃ/ in శివుడు and శోభతో.' },
 
