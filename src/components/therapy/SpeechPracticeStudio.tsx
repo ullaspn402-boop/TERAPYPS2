@@ -583,6 +583,28 @@ export const SpeechPracticeStudio: React.FC = () => {
         ? recordingScore
         : null;
 
+  if (!selectedPatient) {
+    return (
+      <div className="space-y-6 pb-12">
+        <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center max-w-lg mx-auto shadow-xs mt-12">
+          <div className="w-16 h-16 bg-[#E0F2F1] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Mic className="w-8 h-8 text-[#006A61]" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Speech Practice Studio</h2>
+          <p className="text-sm text-slate-500 mb-6">
+            No patient record registered yet. Register a patient to start real-time speech practice sessions.
+          </p>
+          <button
+            onClick={() => setCurrentView('dashboard')}
+            className="px-6 py-2.5 bg-[#006A61] hover:bg-[#005049] text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+          >
+            Go to Dashboard & Register Patient
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* Patient Practice Banner */}

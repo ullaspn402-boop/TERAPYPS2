@@ -168,6 +168,28 @@ export const PatientDetailView: React.FC = () => {
     setIsSubmittingPlan(false);
   };
 
+  if (!selectedPatient) {
+    return (
+      <div className="space-y-6 pb-12">
+        <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center max-w-lg mx-auto shadow-xs mt-12">
+          <div className="w-16 h-16 bg-[#E0F2F1] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <User className="w-8 h-8 text-[#006A61]" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Patient Records</h2>
+          <p className="text-sm text-slate-500 mb-6">
+            No patient record selected. Register a patient to view clinical details and reports.
+          </p>
+          <button
+            onClick={() => setCurrentView('dashboard')}
+            className="px-6 py-2.5 bg-[#006A61] hover:bg-[#005049] text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+          >
+            Go to Dashboard & Register Patient
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const patientSessions = sessionRecords.filter((s) => s.patientId === selectedPatient.id || String(s.patientId) === String(selectedPatient.id) || s.patientId === (selectedPatient as any).patientId);
 
   return (
