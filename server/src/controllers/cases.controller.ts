@@ -10,18 +10,38 @@ import { AuthRequest } from '../middleware/auth';
 
 /**
  * Safely locate a Case document regardless of whether paramId is:
- * 1. Case MongoDB ObjectId
- * 2. caseId string (e.g., "SLT-499", "SLT-106", "CASE-001")
- * 3. Patient MongoDB ObjectId
+ * 1. Patient MongoDB ObjectId (checks Patient._id first for 100% unique match)
+ * 2. Case MongoDB ObjectId
+ * 3. caseId string (e.g., "SLT-499", "SLT-106", "CASE-001")
  * 4. patientId string (e.g., "PT-001-1234")
  * If no Case document exists yet for the Patient, auto-creates it so lookups never fail.
- * Prevents Mongoose CastError exceptions on string lookups.
+ * Prevents Mongoose CastError exceptions and cross-patient ID collisions.
  */
 const findCaseSafely = async (paramId: string, creatorId?: any) => {
   if (!paramId) return null;
 
-  // 1. Try finding Case directly by MongoDB _id (if valid ObjectId)
+  // 1. If paramId is a valid 24-character MongoDB ObjectId:
   if (mongoose.Types.ObjectId.isValid(paramId)) {
+    // Check if it's a Patient _id first for absolute uniqueness
+    const p = await Patient.findById(paramId);
+    if (p) {
+      let c = await Case.findOne({ patientId: p._id });
+      if (!c) {
+        c = await Case.create({
+          caseId: p.caseId || `SLT-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`,
+          patientId: p._id,
+          therapistId: creatorId || p.assignedTherapistId,
+          status: 'NEW',
+          complexity: 'Medium',
+          priority: 'Normal',
+          priorityScore: 0,
+          priorityReasons: []
+        });
+      }
+      return c;
+    }
+
+    // Check if it's a Case _id
     const c = await Case.findById(paramId);
     if (c) return c;
   }
@@ -30,31 +50,22 @@ const findCaseSafely = async (paramId: string, creatorId?: any) => {
   let c = await Case.findOne({ caseId: paramId });
   if (c) return c;
 
-  // 3. Try finding Patient by MongoDB _id, patientId string, or caseId string
-  let p = null;
-  if (mongoose.Types.ObjectId.isValid(paramId)) {
-    p = await Patient.findById(paramId);
-  }
-  if (!p) {
-    p = await Patient.findOne({ $or: [{ patientId: paramId }, { caseId: paramId }] });
-  }
-
+  // 3. Try finding Patient by patientId string or caseId string
+  const p = await Patient.findOne({ $or: [{ patientId: paramId }, { caseId: paramId }] });
   if (p) {
-    // Search Case by patient's MongoDB _id or caseId string
-    c = await Case.findOne({ $or: [{ patientId: p._id }, { caseId: p.caseId }] });
-    if (c) return c;
-
-    // Auto-create missing Case document for this patient if not created yet
-    c = await Case.create({
-      caseId: p.caseId || `SLT-${Math.floor(100 + Math.random() * 900)}`,
-      patientId: p._id,
-      therapistId: creatorId || p.assignedTherapistId,
-      status: 'NEW',
-      complexity: 'Medium',
-      priority: 'Normal',
-      priorityScore: 0,
-      priorityReasons: []
-    });
+    c = await Case.findOne({ patientId: p._id });
+    if (!c) {
+      c = await Case.create({
+        caseId: p.caseId || `SLT-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`,
+        patientId: p._id,
+        therapistId: creatorId || p.assignedTherapistId,
+        status: 'NEW',
+        complexity: 'Medium',
+        priority: 'Normal',
+        priorityScore: 0,
+        priorityReasons: []
+      });
+    }
     return c;
   }
 
@@ -70,7 +81,6 @@ export const getCases = async (req: AuthRequest, res: Response) => {
     let caseQuery: any = {};
 
     if (role === 'student_therapist') {
-      // Student therapist sees cases where they are the case owner OR assigned therapist on patient
       const assignedPatients = await Patient.find({ assignedTherapistId: userId }).select('_id caseId');
       const assignedPatientIds = assignedPatients.map(p => p._id);
       const assignedCaseIds = assignedPatients.map(p => p.caseId);
@@ -83,7 +93,6 @@ export const getCases = async (req: AuthRequest, res: Response) => {
         ]
       };
     } else if (role === 'supervisor') {
-      // Supervisor sees cases explicitly submitted to them via Case.supervisorId OR Patient.supervisorId
       const supPatients = await Patient.find({ supervisorId: userId }).select('_id caseId');
       const patientIds = supPatients.map(p => p._id);
       const patientCaseIds = supPatients.map(p => p.caseId);
@@ -136,8 +145,7 @@ export const createCase = async (req: AuthRequest, res: Response) => {
       return res.json({ success: true, data: populated });
     }
 
-    const count = await Case.countDocuments();
-    const caseId = patient.caseId || `SLT-${String(200 + count + 1).padStart(3, '0')}`;
+    const caseId = patient.caseId || `SLT-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
 
     const newCase = await Case.create({
       caseId,
@@ -180,7 +188,7 @@ export const selectSupervisor = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Supervisor not found' });
     }
 
-    // Safely locate case without CastError, auto-creating if needed
+    // Safely locate case without CastError or cross-patient collisions
     const caseItem = await findCaseSafely(req.params.id, userId);
     if (!caseItem) {
       return res.status(404).json({ success: false, error: 'Case not found' });

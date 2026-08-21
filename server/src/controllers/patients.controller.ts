@@ -88,9 +88,8 @@ export const createPatient = async (req: AuthRequest, res: Response) => {
     const ts = Date.now().toString().slice(-4);
     const patientId = `PT-${paddedId}-${ts}`;
 
-    // Generate case ID
-    const caseCount = await Case.countDocuments();
-    const caseId = `SLT-${String(200 + caseCount + 1).padStart(3, '0')}`;
+    // Generate unique case ID using timestamp to avoid collisions across patients
+    const caseId = `SLT-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
 
     // Create Patient — assign therapistId to the creator
     const patient = await Patient.create({

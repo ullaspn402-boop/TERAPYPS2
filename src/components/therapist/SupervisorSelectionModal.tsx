@@ -80,8 +80,8 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
     try {
       const chosenSup = supervisors.find((s) => s._id === selectedSupervisorId);
 
-      // Try multiple ID candidate representations: caseMongoId, patient.id, patient.caseId
-      const candidateIds = [caseMongoId, patient.id, patient.caseId].filter(Boolean) as string[];
+      // Prioritize patient.id (the patient's unique MongoDB _id) for 100% exact targeting
+      const candidateIds = [patient.id, caseMongoId, patient.caseId].filter(Boolean) as string[];
       let lastError = '';
       let successRes: any = null;
 
