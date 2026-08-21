@@ -59,39 +59,44 @@ function levenshtein(a: string, b: string): number {
  *  3. Edit distance → scale 0-75 based on similarity ratio
  */
 function computeWordSimilarity(recognized: string, expected: string): number {
-  const r = recognized.trim().toLowerCase().replace(/[^a-z\u0900-\u097f\u0c00-\u0c7f\u0b80-\u0bff\u0d00-\u0d7f\u0600-\u06ff]/g, '');
-  const e = expected.trim().toLowerCase().replace(/[^a-z\u0900-\u097f\u0c00-\u0c7f\u0b80-\u0bff\u0d00-\u0d7f\u0600-\u06ff]/g, '');
+  if (!recognized || !expected) return 0;
+
+  // Clean strings allowing all Indic scripts (Hindi \u0900-\u097f, Tamil \u0b80-\u0bff, Telugu \u0c00-\u0c7f, Kannada \u0c80-\u0cff, Malayalam \u0d00-\u0d7f) & Latin a-z
+  const clean = (str: string) =>
+    str
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0900-\u097f\u0b80-\u0bff\u0c00-\u0c7f\u0c80-\u0cff\u0d00-\u0d7f\s]/g, '')
+      .replace(/\s+/g, ' ');
+
+  const r = clean(recognized);
+  const e = clean(expected);
 
   if (!r || !e) return 0;
 
   // Exact match
   if (r === e) return 100;
 
-  // Check if expected is contained in a multi-word recognized string
-  // e.g. expected="raju" and recognized="raju went"
-  const rWords = r.split(/\s+/);
-  if (rWords.includes(e)) return 97;
-  if (rWords.some(w => w === e)) return 97;
+  // Token & sub-word inclusion match
+  const rWords = r.split(' ').filter(Boolean);
+  const eWords = e.split(' ').filter(Boolean);
 
-  // Check if recognized is contained in expected (partial)
-  if (e.includes(r) && r.length >= 2) {
-    const ratio = r.length / e.length;
-    return Math.round(65 + ratio * 20); // 65-85
+  if (eWords.length > 0) {
+    const matchCount = eWords.filter(ew => rWords.some(rw => rw === ew || (rw.length >= 2 && ew.includes(rw)) || (ew.length >= 2 && rw.includes(ew)))).length;
+    if (matchCount > 0) {
+      const ratio = matchCount / eWords.length;
+      return Math.round(75 + ratio * 23); // 75% - 98%
+    }
   }
-  if (r.includes(e)) return 90;
 
-  // Edit distance similarity
+  // Levenshtein edit distance similarity
   const dist = levenshtein(r, e);
   const maxLen = Math.max(r.length, e.length);
   if (maxLen === 0) return 0;
-  const similarity = 1 - dist / maxLen;
 
-  // Map similarity (0..1) to score range (0..75)
-  // A completely wrong word (similarity ≈ 0) → ~5-20
-  // A partial match (similarity ≈ 0.5) → ~35-45
-  // Close match (similarity ≈ 0.8) → ~65-75
-  const score = Math.round(similarity * 75);
-  return Math.max(5, Math.min(75, score));
+  const similarity = 1 - dist / maxLen;
+  const score = Math.round(similarity * 85);
+  return Math.max(55, Math.min(95, score));
 }
 
 export const SpeechPracticeStudio: React.FC = () => {
