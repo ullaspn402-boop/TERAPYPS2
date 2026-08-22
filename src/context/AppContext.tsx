@@ -640,8 +640,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...newP,
           ...res.data,
           id: res.data._id || res.data.id || tempId,
+          caseId: res.data.caseId || newP.caseId,
         };
         setPatients(prev => prev.map(p => (p.id === tempId ? serverP : p)));
+        setSelectedPatientId(serverP.id);
       }
     } catch (e) {
       console.warn('Backend sync note (patient preserved locally):', e);

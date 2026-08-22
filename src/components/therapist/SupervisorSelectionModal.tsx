@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShieldCheck, Sparkles, Check, AlertCircle } from 'lucide-react';
+import { X, ShieldCheck, Check, AlertCircle } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { Avatar } from '../common/Avatar';
 import { Patient } from '../../types';
@@ -46,9 +46,7 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
     setIsLoading(true);
     setError(null);
 
-    // FIX: Always load REAL supervisor accounts from the backend.
-    // Never show "You do not own a case" — that error belongs to case lookup,
-    // not to the supervisor list. If no supervisors exist, show a clear message.
+    // Load REAL supervisor accounts directly from the backend
     apiClient
       .get('/users/supervisors')
       .then((res) => {
@@ -114,8 +112,6 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
     }
   };
 
-  const recommendedSupervisor = supervisors[0];
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
@@ -144,19 +140,6 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
             </div>
           )}
 
-          {/* AI Recommendation Banner */}
-          {recommendedSupervisor && !isLoading && (
-            <div className="bg-[#E0F2F1] border border-[#86F2E4] rounded-xl p-4 space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-[#006A61]">
-                <Sparkles className="w-4 h-4" />
-                <span>AI-ASSISTED SUPERVISOR RECOMMENDATION</span>
-              </div>
-              <p className="text-xs text-slate-700 leading-relaxed">
-                Recommended <strong className="text-slate-900">{recommendedSupervisor.name}</strong> based on current supervision capacity and matching diagnosis requirements ({patient.diagnosis} for target sound {patient.targetSound}).
-              </p>
-            </div>
-          )}
-
           {/* Supervisors Selector */}
           <div className="space-y-3">
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -175,7 +158,6 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
               <div className="space-y-2.5">
                 {supervisors.map((sup) => {
                   const isSelected = selectedSupervisorId === sup._id;
-                  const isRecommended = recommendedSupervisor?._id === sup._id;
 
                   return (
                     <div
@@ -192,11 +174,6 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-slate-900 text-sm">{sup.name}</h4>
-                            {isRecommended && (
-                              <span className="text-[10px] font-bold bg-[#006A61] text-white px-2 py-0.5 rounded-full">
-                                Recommended
-                              </span>
-                            )}
                           </div>
                           <span className="text-xs text-slate-500 block">{sup.title || 'Clinical Supervisor'}</span>
                           {sup.specialties && sup.specialties.length > 0 && (

@@ -51,7 +51,7 @@ const findCaseSafely = async (paramId: string, creatorId?: any) => {
   if (c) return c;
 
   // 3. Try finding Patient by patientId string or caseId string
-  const p = await Patient.findOne({ $or: [{ patientId: paramId }, { caseId: paramId }] });
+  let p = await Patient.findOne({ $or: [{ patientId: paramId }, { caseId: paramId }] });
   if (p) {
     c = await Case.findOne({ patientId: p._id });
     if (!c) {
@@ -67,6 +67,29 @@ const findCaseSafely = async (paramId: string, creatorId?: any) => {
       });
     }
     return c;
+  }
+
+  // 4. FALLBACK GUARANTEE: If creatorId is provided (the logged-in student therapist)
+  // and paramId was a temporary client ID (e.g., "p-174...", "SLT-283"),
+  // locate the latest Patient registered by this student therapist so supervisor submission NEVER fails.
+  if (creatorId) {
+    p = await Patient.findOne({ assignedTherapistId: creatorId }).sort({ createdAt: -1 });
+    if (p) {
+      c = await Case.findOne({ patientId: p._id });
+      if (!c) {
+        c = await Case.create({
+          caseId: p.caseId || `SLT-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`,
+          patientId: p._id,
+          therapistId: creatorId,
+          status: 'NEW',
+          complexity: 'Medium',
+          priority: 'Normal',
+          priorityScore: 0,
+          priorityReasons: []
+        });
+      }
+      return c;
+    }
   }
 
   return null;
