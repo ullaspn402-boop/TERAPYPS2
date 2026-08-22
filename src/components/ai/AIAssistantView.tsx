@@ -23,18 +23,46 @@ import { apiClient } from '../../api/client';
 export const AIAssistantView: React.FC = () => {
   const { selectedPatient, aiActivities, updateAIActivityStatus, setCurrentView } = useApp();
 
-  const [chatMessages, setChatMessages] = useState<
-    { sender: 'ai' | 'user'; text: string; time: string }[]
-  >([
-    {
-      sender: 'ai',
-      text: `Hello! I am analyzing telemetry data for ${selectedPatient.name} (${selectedPatient.caseId}). Recent session data shows strong performance on initial ${selectedPatient.targetSound} words (88%) but coarticulation friction during cluster blends in ${selectedPatient.therapyLanguage} stimulus. How would you like me to assist you with today's session planning?`,
-      time: '09:00 AM',
-    },
-  ]);
-
   const [inputPrompt, setInputPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const [chatMessages, setChatMessages] = useState<
+    { sender: 'ai' | 'user'; text: string; time: string }[]
+  >([]);
+
+  React.useEffect(() => {
+    if (selectedPatient) {
+      setChatMessages([
+        {
+          sender: 'ai',
+          text: `Hello! I am analyzing telemetry data for ${selectedPatient.name} (${selectedPatient.caseId}). Recent session data shows strong performance on initial ${selectedPatient.targetSound} words (88%) but coarticulation friction during cluster blends in ${selectedPatient.therapyLanguage} stimulus. How would you like me to assist you with today's session planning?`,
+          time: '09:00 AM',
+        },
+      ]);
+    }
+  }, [selectedPatient?.id]);
+
+  if (!selectedPatient) {
+    return (
+      <div className="space-y-6 pb-12">
+        <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center max-w-lg mx-auto shadow-xs mt-12">
+          <div className="w-16 h-16 bg-[#E0F2F1] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Bot className="w-8 h-8 text-[#006A61]" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">AI Therapist Assistant</h2>
+          <p className="text-sm text-slate-500 mb-6">
+            No patient record selected. Select a patient from your assigned cases to launch contextual AI decision support.
+          </p>
+          <button
+            onClick={() => setCurrentView('my-cases')}
+            className="px-6 py-2.5 bg-[#006A61] hover:bg-[#005049] text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+          >
+            View My Cases
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleSendMessage = async (textToSend?: string) => {
     const userText = textToSend || inputPrompt;

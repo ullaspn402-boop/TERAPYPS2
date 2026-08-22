@@ -26,11 +26,14 @@ export const SupervisorCenter: React.FC = () => {
     navigateToPatient,
     setCurrentView,
     currentUser,
+    currentView,
   } = useApp();
 
   const [activeTab] = useState<'priority'>('priority');
   const [selectedCaseFilter, setSelectedCaseFilter] = useState<'All' | 'High' | 'Milestone'>('All');
   const [signedCaseIds, setSignedCaseIds] = useState<string[]>([]);
+  
+  const isPlanReviewMode = currentView === 'therapy-plans' || currentView === 'reviews';
 
   // Compute caseload stats from supervisorCases (backend data)
   const totalActiveCases = supervisorCases.length;
@@ -40,6 +43,7 @@ export const SupervisorCenter: React.FC = () => {
   const urgentCount = highPriorityCaseCount;
 
   const filteredCases = supervisorCases.filter((c) => {
+    if (isPlanReviewMode) return true; // Show all cases needing plan/milestone review
     if (selectedCaseFilter === 'High') return c.priority === 'High';
     if (selectedCaseFilter === 'Milestone') return c.reportPending;
     return true;
@@ -58,13 +62,17 @@ export const SupervisorCenter: React.FC = () => {
           <Avatar name={currentUser?.name || "Clinical Supervisor"} role="supervisor" size="xl" />
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">{currentUser?.name || "Clinical Supervisor"}</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                {isPlanReviewMode ? 'Therapy Plan & Milestone Reviews' : (currentUser?.name || "Clinical Supervisor")}
+              </h2>
               <span className="text-xs bg-[#E0F2F1] text-[#006A61] font-semibold px-2.5 py-0.5 rounded-full border border-[#006A61]/20">
                 Senior Clinical Supervisor
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              {supervisorCases.length > 0
+              {isPlanReviewMode
+                ? 'Review, evaluate, and co-sign student therapy plans and 10-session milestone reports'
+                : supervisorCases.length > 0
                 ? `Overseeing ${totalActiveCases} Active Supervised Clinical Cases`
                 : 'Loading caseload...'}
             </p>
@@ -79,7 +87,9 @@ export const SupervisorCenter: React.FC = () => {
       {/* 24 Active Cases Metric Breakdown Strip */}
       <div className="bg-[#041627] text-white p-5 rounded-2xl border border-slate-700 shadow-md space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-base text-white">Active Caseload Overview</h3>
+          <h3 className="font-bold text-base text-white">
+            {isPlanReviewMode ? 'Therapy Plan Reviews Overview' : 'Active Caseload Overview'}
+          </h3>
           <span className="text-xs font-mono text-[#86F2E4] bg-slate-800 px-3 py-1 rounded-full font-bold">
             {totalActiveCases} Active Cases Total
           </span>
@@ -117,7 +127,7 @@ export const SupervisorCenter: React.FC = () => {
         <div
           className="px-4 py-2 rounded-xl text-xs font-bold bg-[#006A61] text-white flex items-center gap-2"
         >
-          Supervisor Priority Triage Queue{urgentCount > 0 ? ` (${urgentCount} Urgent)` : ''}
+          {isPlanReviewMode ? 'Therapy Plan Review Queue' : `Supervisor Priority Triage Queue${urgentCount > 0 ? ` (${urgentCount} Urgent)` : ''}`}
         </div>
       </div>
 
@@ -128,26 +138,33 @@ export const SupervisorCenter: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">
               Every priority case explicitly details what happened, why attention is required, and what actions to review.
             </p>
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
-              {(['All', 'High', 'Milestone'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setSelectedCaseFilter(filter)}
-                  className={`px-3 py-1 rounded-lg font-semibold cursor-pointer ${
-                    selectedCaseFilter === filter
-                      ? 'bg-[#006A61] text-white'
-                      : 'text-slate-600'
-                  }`}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
+            {!isPlanReviewMode && (
+              <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
+                {(['All', 'High', 'Milestone'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setSelectedCaseFilter(filter)}
+                    className={`px-3 py-1 rounded-lg font-semibold cursor-pointer ${
+                      selectedCaseFilter === filter
+                        ? 'bg-[#006A61] text-white'
+                        : 'text-slate-600'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
             {filteredCases.map((c) => {
-              const isSigned = signedCaseIds.includes(c.caseId);
+              const isSigned =
+                signedCaseIds.includes(c.caseId) ||
+                signedCaseIds.includes(c.id) ||
+                c.statusText === 'Approved & Signed Off' ||
+                c.statusText === 'APPROVED' ||
+                (c as any).status === 'APPROVED';
               return (
                 <div
                   key={c.id}
