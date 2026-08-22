@@ -81,27 +81,19 @@ export const getCases = async (req: AuthRequest, res: Response) => {
     let caseQuery: any = {};
 
     if (role === 'student_therapist') {
-      const assignedPatients = await Patient.find({ assignedTherapistId: userId }).select('_id caseId');
-      const assignedPatientIds = assignedPatients.map(p => p._id);
-      const assignedCaseIds = assignedPatients.map(p => p.caseId);
-
-      caseQuery = {
-        $or: [
-          { therapistId: userId },
-          { patientId: { $in: assignedPatientIds } },
-          { caseId: { $in: assignedCaseIds } }
-        ]
-      };
+      // ISOLATION FIX: Use ONLY therapistId — the single authoritative owner field.
+      // Do NOT use $or with patientId/caseId — that can pull in other therapists' cases.
+      caseQuery = { therapistId: userId };
     } else if (role === 'supervisor') {
-      const supPatients = await Patient.find({ supervisorId: userId }).select('_id caseId');
+      // Supervisor sees only cases explicitly submitted to them via Case.supervisorId.
+      // Also check Patient.supervisorId for cases submitted via older patient-first flow.
+      const supPatients = await Patient.find({ supervisorId: userId }).select('_id');
       const patientIds = supPatients.map(p => p._id);
-      const patientCaseIds = supPatients.map(p => p.caseId);
 
       caseQuery = {
         $or: [
           { supervisorId: userId },
-          { patientId: { $in: patientIds } },
-          { caseId: { $in: patientCaseIds } }
+          { patientId: { $in: patientIds } }
         ]
       };
     } else if (role === 'admin') {
@@ -305,11 +297,24 @@ export const approveCase = async (req: Request, res: Response) => {
     const caseItem = await findCaseSafely(req.params.id);
     if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
 
+    // PERSIST FIX: Set status to APPROVED but preserve ALL existing fields:
+    // therapistId, supervisorId, patientId, caseId — nothing is reset.
     caseItem.status = 'APPROVED';
     caseItem.priority = 'Normal';
     await caseItem.save();
 
-    res.json({ success: true, data: caseItem });
+    // Update Patient record: mark Active and ensure supervisorId is preserved.
+    await Patient.findByIdAndUpdate(caseItem.patientId, {
+      status: 'Active',
+      // supervisorId already set when therapist submitted — do NOT overwrite.
+    });
+
+    const populated = await Case.findById(caseItem._id)
+      .populate('patientId', 'name age diagnosis')
+      .populate('therapistId', 'name role')
+      .populate('supervisorId', 'name title');
+
+    res.json({ success: true, data: populated });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

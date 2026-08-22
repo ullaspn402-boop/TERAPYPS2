@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Patient from '../models/Patient';
-import Case from '../models/Case';
 import { AuthRequest } from '../middleware/auth';
 
 const findPatientSafely = async (paramId: string) => {
@@ -25,19 +24,12 @@ export const getPatients = async (req: AuthRequest, res: Response) => {
     let patientQuery: any = {};
 
     if (role === 'student_therapist') {
-      const myCases = await Case.find({ therapistId: userId }).select('patientId');
-      const myPatientIds = myCases.map(c => c.patientId);
-
-      patientQuery = {
-        $or: [
-          { assignedTherapistId: userId },
-          { _id: { $in: myPatientIds } },
-        ],
-      };
+      // ISOLATION FIX: Use ONLY assignedTherapistId — the single authoritative owner field.
+      // Do NOT join with Cases to avoid cross-contamination with other therapists' patients.
+      patientQuery = { assignedTherapistId: userId };
     } else if (role === 'supervisor') {
-      const supervisorCases = await Case.find({ supervisorId: userId }).select('patientId');
-      const supervisorPatientIds = supervisorCases.map(c => c.patientId);
-      patientQuery = { _id: { $in: supervisorPatientIds } };
+      // Supervisor sees patients where they are the assigned supervisor
+      patientQuery = { supervisorId: userId };
     } else if (role === 'admin') {
       patientQuery = {};
     } else {

@@ -150,7 +150,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [aiActivities, setAiActivities] = useState<AIActivitySuggestion[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>(defaultDashboardStats);
 
-  const selectedPatient = patients.find((p) => p.id === selectedPatientId) || patients[0] || null;
+  // ISOLATION FIX: Never auto-select another user's patient.
+  // Only select a patient if selectedPatientId explicitly points to one in this user's list.
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId) || null;
   const unreadNotificationCount = notifications.filter((n) => n.unread).length;
 
   // ─── Fetch Sessions ────────────────────────────────────────────────────────
@@ -313,7 +315,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ─── Main data fetch (runs on login and token restore) ────────────────────
 
-  const fetchDbData = async () => {
+  const fetchDbData = async (fetchRole?: string) => {
+    // Use explicitly passed role (to avoid stale closure right after login),
+    // or fall back to the current role state.
+    const activeRole = fetchRole || role;
     setIsLoading(true);
     try {
       // ── Fetch patients, cases, and AI activities in PARALLEL for speed ──
@@ -346,19 +351,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             : undefined,
         }));
         setPatients(mapped);
-
-        const firstPatient = mapped[0];
-        if (firstPatient) {
-          setSelectedPatientId((prev) => prev || firstPatient.id);
-          fetchSessionsForPatient(firstPatient.id);
+        // ISOLATION FIX: Do NOT auto-select patients[0] — that would show another user's
+        // patient if selectedPatientId is empty. Only load sessions if a patient was
+        // previously selected and still exists in this user's list.
+        if (selectedPatientId) {
+          const stillExists = mapped.find((p: any) => p.id === selectedPatientId);
+          if (stillExists) fetchSessionsForPatient(selectedPatientId);
+          else setSelectedPatientId('');
         }
       } else {
-        // FIX #1: No mock/demo fallback — new account starts with 0 cases
+        // New account with no patients — start clean.
         setPatients([]);
+        setSelectedPatientId('');
       }
 
       // ── Cases → supervisor priority queue ──
-      if (casesRes.success && casesRes.data) {
+      // ISOLATION FIX: Only populate supervisorCases for supervisor/admin roles.
+      // Student therapists must NEVER receive all cases — they only work with their own patients.
+      if ((activeRole === 'supervisor' || activeRole === 'admin') && casesRes.success && casesRes.data) {
         const mappedCases = casesRes.data.map((c: any) => ({
           id: c._id,
           caseId: c.caseId,
@@ -379,6 +389,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           reasons: c.priorityReasons || [],
         }));
         setSupervisorCases(mappedCases);
+      } else if (activeRole === 'student_therapist') {
+        // Student therapists have no supervisor case queue — always empty.
+        setSupervisorCases([]);
       }
 
       // ── AI Activities ──
@@ -432,7 +445,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRoleState(user.role as UserRole);
     setCurrentUser({ name: user.name, role: user.role, avatarType: user.avatarType });
     setIsAuthenticated(true);
-    fetchDbData();
+    // Pass the role explicitly so fetchDbData doesn't rely on stale role state
+    fetchDbData(user.role);
 
     if (user.role === 'supervisor') {
       setCurrentView('supervisor-center');
@@ -469,7 +483,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setRoleState(res.data.role as UserRole);
             setCurrentUser({ name: res.data.name, role: res.data.role, avatarType: res.data.avatarType });
             setIsAuthenticated(true);
-            fetchDbData();
+            fetchDbData(res.data.role);
           } else {
             logout();
           }
@@ -752,7 +766,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markNotificationAsRead,
         markAllNotificationsAsRead,
         allocateCaseToTherapist,
-        refreshData: fetchDbData,
+        refreshData: () => fetchDbData(role),
       }}
     >
       {children}
