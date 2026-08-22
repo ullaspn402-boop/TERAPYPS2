@@ -632,6 +632,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           historicalProgress: updatedHistory,
         }).catch((e) => console.warn('DB update error on level advance:', e));
 
+        // Sync supervisor cases queue
+        setSupervisorCases((prev) =>
+          prev.map((sc) => {
+            if (sc.patientId === actualId || sc.patientName?.toLowerCase() === target?.name?.toLowerCase()) {
+              return {
+                ...sc,
+                sessionsCompleted: newSessionCount,
+                conversationScore: newProgressPct,
+              };
+            }
+            return sc;
+          })
+        );
+
         return {
           ...p,
           currentLevel: newLevel,
@@ -702,6 +716,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           level: (p.currentLevel || 'Word') as TherapyLevel,
         };
         const updatedHistory = [...prevHistory, newHistoryEntry].slice(-10);
+
+        // Sync supervisor cases queue
+        setSupervisorCases((prev) =>
+          prev.map((sc) => {
+            if (sc.patientId === patientId || sc.patientName?.toLowerCase() === p.name?.toLowerCase()) {
+              return {
+                ...sc,
+                sessionsCompleted: newSessionCount,
+                conversationScore: newProgressPct,
+              };
+            }
+            return sc;
+          })
+        );
 
         return {
           ...p,
