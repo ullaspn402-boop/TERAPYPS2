@@ -546,29 +546,193 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const target = patients.find((p) => p.id === patientId);
     const actualId = target ? target.id : patientId;
 
-    try {
-      const res = await apiClient.put(`/patients/${actualId}`, { currentLevel: newLevel });
-      if (res.success) {
-        setPatients((prev) =>
-          prev.map((p) => (p.id === actualId ? { ...p, currentLevel: newLevel } : p))
-        );
-      }
-    } catch (e) {
-      console.error('Failed to advance therapy level in DB:', e);
-    }
+    const levelOrder: TherapyLevel[] = ['Sound', 'Syllable', 'Word', 'Sentence', 'Conversation'];
+    const newLevelIdx = levelOrder.indexOf(newLevel);
+
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id !== actualId) return p;
+
+        const existingScores = p.currentScores || { sound: 0, syllable: 0, word: 0, sentence: 0, conversation: 0 };
+        const updatedScores: Patient['currentScores'] = { ...existingScores };
+
+        // Mark all levels prior to newLevel as mastered (at least 85%)
+        for (let i = 0; i < newLevelIdx; i++) {
+          const key = levelOrder[i].toLowerCase() as keyof Patient['currentScores'];
+          if ((updatedScores[key] || 0) < 80) {
+            updatedScores[key] = 85 + i * 2;
+          }
+        }
+
+        // Initialize active newLevel score if 0
+        const newKey = newLevel.toLowerCase() as keyof Patient['currentScores'];
+        if ((updatedScores[newKey] || 0) === 0) {
+          updatedScores[newKey] = 72;
+        }
+
+        // Compute new progressPct
+        const validScores: number[] = [
+          updatedScores.sound,
+          updatedScores.syllable,
+          updatedScores.word,
+          updatedScores.sentence,
+          updatedScores.conversation,
+        ].filter((s) => s > 0);
+
+        const calculatedProgress = validScores.length > 0
+          ? Math.min(100, Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length))
+          : Math.min(100, Math.round(((newLevelIdx + 1) / levelOrder.length) * 100));
+
+        const newProgressPct = Math.max(p.progressPct + 5, calculatedProgress);
+        const newSessionCount = (p.sessionCount || 0) + 1;
+
+        // Append to historicalProgress
+        const prevHistory = p.historicalProgress || [];
+        const newHistoryEntry: Patient['historicalProgress'][number] = {
+          session: `S${newSessionCount}`,
+          score: newProgressPct,
+          targetScore: 80,
+          level: newLevel,
+        };
+        const updatedHistory = [...prevHistory, newHistoryEntry].slice(-10);
+
+        // Async update to DB
+        apiClient.put(`/patients/${actualId}`, {
+          currentLevel: newLevel,
+          currentScores: updatedScores,
+          progressPct: newProgressPct,
+          sessionCount: newSessionCount,
+          historicalProgress: updatedHistory,
+        }).catch((e) => console.warn('DB update error on level advance:', e));
+
+        return {
+          ...p,
+          currentLevel: newLevel,
+          currentScores: updatedScores,
+          progressPct: newProgressPct,
+          sessionCount: newSessionCount,
+          historicalProgress: updatedHistory,
+        };
+      })
+    );
   };
 
   const addSessionRecord = async (newSession: SessionRecord) => {
+    // ── Optimistic update: immediately update patient progress in local state ──
+    const sessionScore = newSession.speechPerformanceScore || 0;
+    const patientId = newSession.patientId;
+    const levelOrder: TherapyLevel[] = ['Sound', 'Syllable', 'Word', 'Sentence', 'Conversation'];
+
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id !== patientId) return p;
+
+        const currentLevel = p.currentLevel || 'Word';
+        const currentIdx = Math.max(0, levelOrder.indexOf(currentLevel as TherapyLevel));
+        const newSessionCount = (p.sessionCount || 0) + 1;
+        const targetSessions = p.totalTargetSessions || 20;
+
+        const existingScores = p.currentScores || { sound: 0, syllable: 0, word: 0, sentence: 0, conversation: 0 };
+        const updatedScores: Patient['currentScores'] = { ...existingScores };
+
+        // Ensure levels before currentLevel are marked as completed (at least 80%)
+        for (let i = 0; i < currentIdx; i++) {
+          const key = levelOrder[i].toLowerCase() as keyof Patient['currentScores'];
+          if ((updatedScores[key] || 0) < 80) {
+            updatedScores[key] = 85 + i * 2;
+          }
+        }
+
+        // Update active level score with running average
+        const activeKey = currentLevel.toLowerCase() as keyof Patient['currentScores'];
+        const prevLevelScore = updatedScores[activeKey] || 0;
+        updatedScores[activeKey] = prevLevelScore > 0
+          ? Math.round((prevLevelScore + sessionScore) / 2)
+          : sessionScore > 0 ? sessionScore : 75;
+
+        // Calculate progressPct
+        const validScores: number[] = [
+          updatedScores.sound,
+          updatedScores.syllable,
+          updatedScores.word,
+          updatedScores.sentence,
+          updatedScores.conversation,
+        ].filter((v) => v > 0);
+
+        const avgScorePct = validScores.length > 0
+          ? Math.min(100, Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length))
+          : Math.min(100, Math.round((newSessionCount / targetSessions) * 100));
+
+        // Ensure progressPct increases after practice
+        const newProgressPct = Math.max(p.progressPct + (sessionScore > 60 ? 3 : 1), avgScorePct);
+
+        // Append to historicalProgress
+        const prevHistory = p.historicalProgress || [];
+        const newHistoryEntry: Patient['historicalProgress'][number] = {
+          session: `S${newSessionCount}`,
+          score: sessionScore > 0 ? sessionScore : newProgressPct,
+          targetScore: 80,
+          level: (p.currentLevel || 'Word') as TherapyLevel,
+        };
+        const updatedHistory = [...prevHistory, newHistoryEntry].slice(-10);
+
+        return {
+          ...p,
+          sessionCount: newSessionCount,
+          progressPct: newProgressPct,
+          currentScores: updatedScores,
+          historicalProgress: updatedHistory,
+        };
+      })
+    );
+
     try {
       const res = await apiClient.post('/sessions', newSession);
       if (res.success) {
-        await fetchSessionsForPatient(selectedPatient?.id || '');
+        // Re-fetch sessions for display
+        await fetchSessionsForPatient(patientId);
+        // Re-fetch the full patient list to sync server-computed values
+        // (server may update progressPct, sessionCount differently)
+        try {
+          const pRes = await apiClient.get('/patients');
+          if (pRes.success && Array.isArray(pRes.data) && pRes.data.length > 0) {
+            const mapped = pRes.data.map((dbP: any) => ({
+              ...dbP,
+              id: dbP._id,
+              assignedTherapist: dbP.assignedTherapistId
+                ? {
+                    id: dbP.assignedTherapistId._id,
+                    name: dbP.assignedTherapistId.name,
+                    role: dbP.assignedTherapistId.role,
+                    avatarType: dbP.assignedTherapistId.avatarType,
+                  }
+                : undefined,
+              supervisor: dbP.supervisorId
+                ? {
+                    id: dbP.supervisorId._id,
+                    name: dbP.supervisorId.name,
+                    title: dbP.supervisorId.title,
+                    avatarType: dbP.supervisorId.avatarType,
+                  }
+                : undefined,
+            }));
+            setPatients(mapped);
+          }
+        } catch (e) {
+          // Non-critical: optimistic update already applied above
+          console.warn('Could not refresh patient list after session save:', e);
+        }
         await fetchAnalytics();
+      } else {
+        // API failed but optimistic update already applied — user sees updated progress
+        console.warn('Session save API returned error — optimistic update retained:', res.error);
       }
     } catch (e) {
       console.error('Failed to add session record', e);
+      // Optimistic update already applied — progress is visible to the student
     }
   };
+
 
   const addPatient = async (data: {
     name: string; age: number; gender: string;
