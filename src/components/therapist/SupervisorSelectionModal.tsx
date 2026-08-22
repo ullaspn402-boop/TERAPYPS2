@@ -23,7 +23,7 @@ interface SupervisorSelectionModalProps {
   caseMongoId?: string;
   isOpen: boolean;
   onClose: () => void;
-  onSelectSuccess: (supervisorName: string) => void;
+  onSelectSuccess?: (supervisorName: string) => void;
 }
 
 export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> = ({
@@ -100,7 +100,7 @@ export const SupervisorSelectionModal: React.FC<SupervisorSelectionModalProps> =
 
       if (successRes && successRes.success) {
         await refreshData();
-        onSelectSuccess(chosenSup?.name || 'Selected Supervisor');
+        onSelectSuccess?.(chosenSup?.name || 'Selected Supervisor');
         onClose();
       } else {
         setError(lastError || 'Failed to assign supervisor. Please try again.');

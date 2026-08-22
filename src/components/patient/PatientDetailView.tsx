@@ -1028,6 +1028,9 @@ export const PatientDetailView: React.FC = () => {
           patient={selectedPatient}
           isOpen={showSupervisorModal}
           onClose={() => setShowSupervisorModal(false)}
+          onSelectSuccess={() => {
+            setShowSupervisorModal(false);
+          }}
         />
       )}
     </div>
